@@ -71,6 +71,27 @@
       },
       "additionalProperties": false
     },
+    "phase3": {
+      "type": "object",
+      "required": ["enabled", "base_scene", "output_scene", "preview_video"],
+      "properties": {
+        "enabled": {"type": "boolean"},
+        "base_scene": {"type": "string", "minLength": 1},
+        "output_scene": {"type": "string", "minLength": 1},
+        "preview_video": {"type": "string", "minLength": 1},
+        "resolution_percentage": {"type": "integer", "minimum": 1, "maximum": 100},
+        "camera": {
+          "type": "object",
+          "properties": {
+            "close_up_distance": {"type": "number", "exclusiveMinimum": 0},
+            "medium_distance": {"type": "number", "exclusiveMinimum": 0},
+            "wide_distance": {"type": "number", "exclusiveMinimum": 0}
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
     "motion_fallbacks": {
       "type": "object",
       "additionalProperties": {"type": "array", "items": {"type": "string"}}

@@ -17,3 +17,6 @@ projects/*/dialogue/*.wav
 projects/*/dialogue/*.txt
 projects/*/dialogue/recorded/
 projects/*/lip_sync/*.json
+
+# Generated Phase 3 Blender assembly
+projects/*/blender_scenes/phase3_*.blend
