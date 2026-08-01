@@ -74,6 +74,14 @@ phase4:
   loudness_target_lufs: -16
   true_peak_db: -1.5
   loudness_range_lu: 11
+phase5:
+  enabled: true
+  report: generated/production_report.json
+  max_asset_warnings: 0
+  max_unresolved_motion_assignments: 0
+  max_timing_warnings: 0
+  min_output_size_bytes: 1024
+  duration_tolerance_seconds: 0.25
 characters:
   Aiko:
     model_id: aiko_demo

@@ -2,7 +2,8 @@
 param(
     [string]$Blender = "D:\Blender_5.1\blender.exe",
     [string]$Project = "projects\demo",
-    [switch]$Render
+    [switch]$Render,
+    [switch]$SkipPhase2
 )
 
 $ErrorActionPreference = "Stop"
@@ -16,9 +17,11 @@ if (-not (Test-Path $Blender -PathType Leaf)) {
     throw "Blender executable not found: $Blender"
 }
 
-Write-Host "Refreshing Phase 2 outputs..."
-& $Python run_pipeline.py --project $Project --phase 2 --preset preview --resume
-if ($LASTEXITCODE -ne 0) { throw "Phase 2 refresh failed with exit code $LASTEXITCODE" }
+if (-not $SkipPhase2) {
+    Write-Host "Refreshing Phase 2 outputs..."
+    & $Python run_pipeline.py --project $Project --phase 2 --preset preview --resume
+    if ($LASTEXITCODE -ne 0) { throw "Phase 2 refresh failed with exit code $LASTEXITCODE" }
+}
 
 Write-Host "Preparing validated Phase 3 manifest..."
 & $Python prepare_phase3.py --project $Project

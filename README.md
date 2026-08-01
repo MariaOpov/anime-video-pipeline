@@ -1,4 +1,4 @@
-# Anime Video Pipeline — Phase 4
+# Anime Video Pipeline — Phase 5
 
 A Windows-first foundation for an offline, reusable anime production pipeline.
 Phase 1 turns a text script into validated screenplay and shot-list JSON, indexes
@@ -7,7 +7,9 @@ offline Piper speech, exact dialogue timing, recorded-voice overrides, and
 Rhubarb mouth cues mapped to configurable MMD/Blender morph names. Phase 3
 assembles those contracts inside Blender as shot cameras, synchronized audio,
 and animated mouth shape keys. Phase 4 generates subtitles, normalizes audio,
-and exports a verified delivery MP4 through a local FFmpeg runtime.
+and exports a verified delivery MP4 through a local FFmpeg runtime. Phase 5
+orchestrates the entire production with one command and refuses release unless
+every configured quality gate passes.
 
 ## Architecture
 
@@ -42,6 +44,9 @@ Phase 3 manifest ----------> Blender cameras + WAV strips + mouth keys
           |
           v
 Phase 3 preview -----------> SRT + loudness normalization + final MP4
+          |
+          v
+Phase 5 quality gates -----> production_report.json
 ```
 
 The pipeline is stage-based and idempotent. Each completed stage is recorded in
@@ -94,6 +99,17 @@ is required. `auto` subtitle mode burns subtitles when the local build supports
 the libass subtitles filter and otherwise creates a selectable MP4 subtitle
 track.
 
+Run all production phases and the final audit with one command:
+
+```powershell
+.\run_all.ps1 -Render
+```
+
+Use `-Setup` on a fresh checkout to install the local Python, voice, lip-sync,
+and FFmpeg dependencies first. Resume is enabled by default; `-Fresh` forces
+Phase 1–2 regeneration. Rendering requires the explicit `-Render` switch so an
+expensive Blender job cannot start accidentally.
+
 Optional local LLM:
 
 ```powershell
@@ -145,6 +161,15 @@ can expose their own configured morph names instead.
 Phase 4 never overwrites the Phase 3 preview. The output is first written to a
 temporary MP4, verified, and atomically promoted to `final_video.mp4`.
 
+## Phase 5 outputs
+
+- `generated/phase5_run_record.json`: status and elapsed time for every stage.
+- `generated/production_report.json`: tool versions, QA results, metrics, and artifacts.
+
+Phase 5 checks all Phase 1–4 contracts, enforces configurable warning limits,
+compares Blender counts to the manifest, and verifies final subtitles, audio,
+duration, dimensions, and file size. See `PHASE5.md` for the full release gate.
+
 ## Asset metadata
 
 Place one `.asset.yaml` sidecar anywhere below an asset-library directory. The
@@ -158,12 +183,14 @@ python run_pipeline.py --project projects/demo --dry-run
 python run_pipeline.py --project projects/demo --preset preview
 python run_pipeline.py --project projects/demo --resume
 python -m unittest discover -s tests -v
+.\run_all.ps1 -Render
 ```
 
 `--dry-run` validates inputs and reports planned work without writing generated
 production outputs. Use `--verbose` for console debug messages.
 
-## Next phases
+## Possible extensions
 
-1. Package orchestration, quality gates, and one-command production.
-2. Optional ComfyUI and improved emotional animation.
+1. Optional ComfyUI backgrounds and image-to-video inserts.
+2. Improved emotional body, eye, and camera animation.
+3. CI smoke tests with cached tool runtimes.

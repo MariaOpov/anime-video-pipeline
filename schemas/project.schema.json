@@ -115,6 +115,20 @@
       },
       "additionalProperties": false
     },
+    "phase5": {
+      "type": "object",
+      "required": ["enabled", "report"],
+      "properties": {
+        "enabled": {"type": "boolean"},
+        "report": {"type": "string", "minLength": 1},
+        "max_asset_warnings": {"type": "integer", "minimum": 0},
+        "max_unresolved_motion_assignments": {"type": "integer", "minimum": 0},
+        "max_timing_warnings": {"type": "integer", "minimum": 0},
+        "min_output_size_bytes": {"type": "integer", "minimum": 1},
+        "duration_tolerance_seconds": {"type": "number", "minimum": 0, "maximum": 10}
+      },
+      "additionalProperties": false
+    },
     "motion_fallbacks": {
       "type": "object",
       "additionalProperties": {"type": "array", "items": {"type": "string"}}
