@@ -92,6 +92,29 @@
       },
       "additionalProperties": false
     },
+    "phase4": {
+      "type": "object",
+      "required": ["enabled", "input_video", "subtitle_file", "output_video"],
+      "properties": {
+        "enabled": {"type": "boolean"},
+        "input_video": {"type": "string", "minLength": 1},
+        "subtitle_file": {"type": "string", "minLength": 1},
+        "output_video": {"type": "string", "minLength": 1},
+        "subtitle_mode": {"enum": ["auto", "burn", "soft"]},
+        "include_speaker_names": {"type": "boolean"},
+        "subtitle_language_code": {"type": "string", "minLength": 3, "maxLength": 3},
+        "subtitle_style": {"type": "string", "minLength": 1},
+        "video_codec": {"type": "string", "minLength": 1},
+        "video_preset": {"enum": ["ultrafast", "superfast", "veryfast", "faster", "fast", "medium", "slow", "slower", "veryslow"]},
+        "crf": {"type": "integer", "minimum": 0, "maximum": 51},
+        "audio_codec": {"type": "string", "minLength": 1},
+        "audio_bitrate": {"type": "string", "pattern": "^[0-9]+[kKmM]$"},
+        "loudness_target_lufs": {"type": "number", "minimum": -70, "maximum": -5},
+        "true_peak_db": {"type": "number", "minimum": -9, "maximum": 0},
+        "loudness_range_lu": {"type": "number", "minimum": 1, "maximum": 50}
+      },
+      "additionalProperties": false
+    },
     "motion_fallbacks": {
       "type": "object",
       "additionalProperties": {"type": "array", "items": {"type": "string"}}

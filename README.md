@@ -1,4 +1,4 @@
-# Anime Video Pipeline — Phase 3
+# Anime Video Pipeline — Phase 4
 
 A Windows-first foundation for an offline, reusable anime production pipeline.
 Phase 1 turns a text script into validated screenplay and shot-list JSON, indexes
@@ -6,7 +6,8 @@ local assets, and selects motions with deterministic fallbacks. Phase 2 adds
 offline Piper speech, exact dialogue timing, recorded-voice overrides, and
 Rhubarb mouth cues mapped to configurable MMD/Blender morph names. Phase 3
 assembles those contracts inside Blender as shot cameras, synchronized audio,
-and animated mouth shape keys.
+and animated mouth shape keys. Phase 4 generates subtitles, normalizes audio,
+and exports a verified delivery MP4 through a local FFmpeg runtime.
 
 ## Architecture
 
@@ -38,6 +39,9 @@ screenplay.json + dialogue_timeline.json + lip_sync/*.json
           |
           v
 Phase 3 manifest ----------> Blender cameras + WAV strips + mouth keys
+          |
+          v
+Phase 3 preview -----------> SRT + loudness normalization + final MP4
 ```
 
 The pipeline is stage-based and idempotent. Each completed stage is recorded in
@@ -77,6 +81,18 @@ Assemble a Blender scene after Phase 2:
 The first command creates the editable `.blend`; `-Render` also renders the
 configured preview MP4. The demo uses 50% resolution for a faster acceptance
 render while retaining the project's 24 fps timeline.
+
+Finish the rendered preview:
+
+```powershell
+.\setup_phase4.ps1
+.\run_phase4.ps1
+```
+
+The Phase 4 setup installs a project-local FFmpeg binary. No global PATH change
+is required. `auto` subtitle mode burns subtitles when the local build supports
+the libass subtitles filter and otherwise creates a selectable MP4 subtitle
+track.
 
 Optional local LLM:
 
@@ -120,6 +136,15 @@ Phase 3 opens the configured base scene read-only and saves to a separate output
 scene. The demo creates non-destructive fallback mouth controls; real MMD models
 can expose their own configured morph names instead.
 
+## Phase 4 outputs
+
+- `subtitles/dialogue_vi.srt`: UTF-8 subtitles generated from exact timing.
+- `output/final_video.mp4`: H.264/AAC delivery video with normalized dialogue.
+- `generated/phase4_report.json`: subtitle mode, duration, dimensions, and size.
+
+Phase 4 never overwrites the Phase 3 preview. The output is first written to a
+temporary MP4, verified, and atomically promoted to `final_video.mp4`.
+
 ## Asset metadata
 
 Place one `.asset.yaml` sidecar anywhere below an asset-library directory. The
@@ -140,6 +165,5 @@ production outputs. Use `--verbose` for console debug messages.
 
 ## Next phases
 
-1. FFmpeg audio mix, subtitles, and final export.
-2. Package orchestration, quality gates, and one-command production.
-3. Optional ComfyUI and improved emotional animation.
+1. Package orchestration, quality gates, and one-command production.
+2. Optional ComfyUI and improved emotional animation.

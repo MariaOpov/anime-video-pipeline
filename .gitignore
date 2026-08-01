@@ -20,3 +20,7 @@ projects/*/lip_sync/*.json
 
 # Generated Phase 3 Blender assembly
 projects/*/blender_scenes/phase3_*.blend
+
+# Generated Phase 4 subtitles
+projects/*/subtitles/*.srt
+projects/*/subtitles/*.vtt
