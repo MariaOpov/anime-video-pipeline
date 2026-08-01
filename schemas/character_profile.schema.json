@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": [
+    "schema_version", "character", "source_model", "model_format",
+    "model_sha256", "cache_blend", "cache_collection", "armature_object",
+    "target_height_meters", "dimensions", "object_count", "mesh_count",
+    "material_count", "bone_count", "morph_count", "texture_count",
+    "missing_texture_count", "bone_mapping", "morph_mapping", "license", "warnings"
+  ],
+  "properties": {
+    "schema_version": {"const": 1},
+    "character": {"type": "string", "minLength": 1},
+    "source_model": {"type": "string", "minLength": 1},
+    "model_format": {"enum": ["pmx", "pmd"]},
+    "model_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "cache_blend": {"type": "string", "minLength": 1},
+    "cache_collection": {"type": "string", "minLength": 1},
+    "armature_object": {"type": "string", "minLength": 1},
+    "target_height_meters": {"type": "number", "minimum": 0.5, "maximum": 5},
+    "dimensions": {"$ref": "#/$defs/vector3"},
+    "object_count": {"type": "integer", "minimum": 1},
+    "mesh_count": {"type": "integer", "minimum": 1},
+    "material_count": {"type": "integer", "minimum": 0},
+    "bone_count": {"type": "integer", "minimum": 1},
+    "morph_count": {"type": "integer", "minimum": 0},
+    "texture_count": {"type": "integer", "minimum": 0},
+    "missing_texture_count": {"type": "integer", "minimum": 0},
+    "bone_mapping": {
+      "type": "object",
+      "required": ["spine", "head", "arm.L", "arm.R", "leg.L", "leg.R", "eyes"],
+      "additionalProperties": {"type": ["string", "null"]}
+    },
+    "morph_mapping": {
+      "type": "object",
+      "required": ["A", "I", "U", "E", "O", "blink"],
+      "additionalProperties": {"type": ["string", "null"]}
+    },
+    "license": {
+      "type": "object",
+      "required": ["name", "creator", "source"],
+      "properties": {
+        "name": {"type": "string"},
+        "creator": {"type": "string"},
+        "source": {"type": "string"}
+      },
+      "additionalProperties": false
+    },
+    "warnings": {"type": "array", "items": {"type": "string"}}
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "vector3": {
+      "type": "array", "minItems": 3, "maxItems": 3,
+      "items": {"type": "number"}
+    }
+  }
+}

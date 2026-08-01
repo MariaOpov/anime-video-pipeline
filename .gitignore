@@ -31,3 +31,8 @@ projects/*/generated/production_report.json
 
 # Generated Phase 6 AI/rules motion intent
 projects/*/generated/motion_intent_plan.json
+
+# Local Phase 7 character bundles, normalized caches, profiles, and requests
+projects/*/local_assets/
+projects/*/blender_cache/
+projects/*/generated/phase7_import_request.json

@@ -169,6 +169,24 @@
       },
       "additionalProperties": false
     },
+    "phase7": {
+      "type": "object",
+      "required": ["enabled", "registry", "local_asset_dir", "cache_dir"],
+      "properties": {
+        "enabled": {"type": "boolean"},
+        "registry": {"type": "string", "minLength": 1},
+        "local_asset_dir": {"type": "string", "minLength": 1},
+        "cache_dir": {"type": "string", "minLength": 1},
+        "target_height_meters": {"type": "number", "minimum": 0.5, "maximum": 5},
+        "rotation_z_degrees": {"type": "number", "minimum": -180, "maximum": 180},
+        "minimum_bone_alias_coverage": {"type": "number", "minimum": 0, "maximum": 1},
+        "minimum_mouth_morph_coverage": {"type": "number", "minimum": 0, "maximum": 1},
+        "require_blink_morph": {"type": "boolean"},
+        "require_complete_textures": {"type": "boolean"},
+        "require_license_metadata": {"type": "boolean"}
+      },
+      "additionalProperties": false
+    },
     "motion_fallbacks": {
       "type": "object",
       "additionalProperties": {"type": "array", "items": {"type": "string"}}

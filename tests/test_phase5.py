@@ -29,7 +29,7 @@ class Phase5Tests(unittest.TestCase):
             )
             self.assertEqual(report["status"], "complete")
             self.assertEqual(report["summary"]["failed_gate_count"], 0)
-            self.assertEqual(report["summary"]["quality_gate_count"], 30)
+            self.assertEqual(report["summary"]["quality_gate_count"], 31)
             self.assertEqual(report["summary"]["mouth_cue_count"], 2)
             self.assertTrue(output.is_file())
             self.assertIn("final_video", [item["name"] for item in report["artifacts"]])
@@ -210,6 +210,60 @@ class Phase5Tests(unittest.TestCase):
             gate = next(item for item in report["quality_gates"] if item["name"] == "timing_warnings_within_limit")
             self.assertEqual(gate["status"], "passed")
 
+    def test_production_character_gate_requires_cached_model_to_be_loaded(self):
+        with tempfile.TemporaryDirectory() as directory:
+            project = Path(directory)
+            self._write_fixture(project)
+            manifest_path = project / "generated" / "phase3_manifest.json"
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            character = {
+                "character": "Aiko", "profile": "local_assets/aiko.json",
+                "cache_blend": "blender_cache/aiko.blend",
+                "cache_collection": "PIPE_CHARACTER_AIKO",
+                "armature_object": "PIPE_Aiko_Armature", "model_sha256": "a" * 64,
+                "bone_mapping": {"spine": "上半身"},
+                "morph_mapping": {"A": "あ"},
+                "required_bone_count": 6, "resolved_bone_count": 6,
+                "bone_coverage": 1.0, "required_mouth_morph_count": 5,
+                "resolved_mouth_morph_count": 5, "mouth_morph_coverage": 1.0,
+                "blink_morph_resolved": True, "texture_count": 4,
+                "missing_texture_count": 0, "license_name": "Unknown",
+                "license_warning": True, "warnings": [], "ready": True,
+            }
+            manifest["character_assets"] = {
+                "enabled": True, "characters": [character], "configured_count": 1,
+                "ready_count": 1, "missing_texture_count": 0,
+                "warning_count": 0, "license_warning_count": 1,
+            }
+            manifest["summary"].update({
+                "production_character_count": 1, "character_asset_ready_count": 1,
+                "character_texture_missing_count": 0,
+                "character_asset_warning_count": 0,
+                "character_license_warning_count": 1,
+            })
+            atomic_write_json(manifest_path, manifest)
+            with self.assertRaisesRegex(QualityGateError, "production_character_assets_ready"):
+                Phase5Auditor(self._config(project), self.schemas).run(
+                    tool_versions=self.tool_versions
+                )
+            scene_path = project / "generated" / "phase3_scene_report.json"
+            scene = json.loads(scene_path.read_text(encoding="utf-8"))
+            scene.update({
+                "production_character_count": 1,
+                "production_character_loaded_count": 1,
+                "resolved_character_bone_alias_count": 6,
+                "resolved_character_mouth_morph_count": 5,
+                "character_texture_missing_count": 0,
+                "character_license_warning_count": 1,
+            })
+            atomic_write_json(scene_path, scene)
+            report, _ = Phase5Auditor(self._config(project), self.schemas).run(
+                tool_versions=self.tool_versions
+            )
+            gate = next(item for item in report["quality_gates"]
+                        if item["name"] == "production_character_assets_ready")
+            self.assertEqual(gate["status"], "passed")
+
     def test_embeds_stage_run_record(self):
         with tempfile.TemporaryDirectory() as directory:
             project = Path(directory)
@@ -287,7 +341,7 @@ class Phase5Tests(unittest.TestCase):
             "duration_seconds": 1.0, "mouth_cues": cues,
         })
         manifest = {
-            "version": 4, "project_name": "Phase 5 Test", "fps": 24, "frame_start": 1, "frame_end": 48,
+            "version": 5, "project_name": "Phase 5 Test", "fps": 24, "frame_start": 1, "frame_end": 48,
             "base_scene": "blender_scenes/base.blend", "output_scene": "blender_scenes/assembled.blend",
             "preview_video": "renders/preview.mp4",
             "render": {"engine": "BLENDER_EEVEE", "width": 1280, "height": 720, "resolution_percentage": 50},
@@ -301,6 +355,10 @@ class Phase5Tests(unittest.TestCase):
                          "body_facing_count": 0, "camera_motion_count": 0,
                          "framing_risk_count": 0, "camera_collision_risk_count": 0,
                          "continuity_violation_count": 0, "blocking_conflict_count": 0},
+            "character_assets": {"enabled": False, "characters": [],
+                                 "configured_count": 0, "ready_count": 0,
+                                 "missing_texture_count": 0, "warning_count": 0,
+                                 "license_warning_count": 0},
             "shots": [{"scene_id": "scene_001", "shot_id": "scene_001_shot_001", "start_frame": 1,
                        "end_frame": 48, "shot_type": "medium", "movement": "static", "target": "Aiko"}],
             "dialogue": [{"line_id": "line_001", "shot_id": "scene_001_shot_001", "character": "Aiko",
@@ -314,7 +372,12 @@ class Phase5Tests(unittest.TestCase):
                         "blocking_shot_count": 0, "character_placement_count": 0,
                         "body_facing_count": 0, "camera_motion_count": 0,
                         "framing_risk_count": 0, "camera_collision_risk_count": 0,
-                        "continuity_violation_count": 0, "blocking_conflict_count": 0},
+                        "continuity_violation_count": 0, "blocking_conflict_count": 0,
+                        "production_character_count": 0,
+                        "character_asset_ready_count": 0,
+                        "character_texture_missing_count": 0,
+                        "character_asset_warning_count": 0,
+                        "character_license_warning_count": 0},
         }
         atomic_write_json(project / "generated" / "phase3_manifest.json", manifest)
         (project / "blender_scenes" / "assembled.blend").write_bytes(b"BLENDER" * 32)
@@ -334,6 +397,12 @@ class Phase5Tests(unittest.TestCase):
             "camera_motion_count": 0, "camera_keyframe_count": 0,
             "framing_risk_count": 0, "camera_collision_risk_count": 0,
             "continuity_violation_count": 0, "blocking_conflict_count": 0,
+            "production_character_count": 0,
+            "production_character_loaded_count": 0,
+            "resolved_character_bone_alias_count": 0,
+            "resolved_character_mouth_morph_count": 0,
+            "character_texture_missing_count": 0,
+            "character_license_warning_count": 0,
             "preview_video": "renders/preview.mp4",
         })
         (project / "subtitles" / "dialogue.srt").write_text("1\n00:00:00,000 --> 00:00:01,000\nXin chào\n", encoding="utf-8")

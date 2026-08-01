@@ -58,6 +58,8 @@ time remain in `generated/phase5_run_record.json` for diagnosis.
   create real Blender keyframes, and contain zero clip conflicts.
 - Blocking placements, body facing, and camera moves match the manifest, create
   real Blender keys, and contain zero framing, collision, continuity, or staging risks.
+- Every activated Phase 7 character is ready and loaded with matching rig,
+  facial morph, missing-texture, and license-warning counts.
 - The assembled scene and rendered Phase 3 preview exist.
 - The Phase 4 MP4, subtitle count, loudness flag, dimensions, duration, and size pass.
 - The final duration does not exceed `maximum_video_duration`.

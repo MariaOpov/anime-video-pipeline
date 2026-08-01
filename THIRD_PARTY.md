@@ -53,3 +53,13 @@ redistributed by this repository.
 
 Ollama and model weights are not installed or redistributed by Phase 6. Review
 the license of the selected Ollama model before distributing derived content.
+
+## mmd_tools and production models
+
+- Project: MMD-Blender/blender_mmd_tools
+- License: MIT
+- Use: local PMX/PMD import and MMD model representation in Blender
+
+Phase 7 does not download or redistribute `mmd_tools`, PMX/PMD files, textures,
+or cached model data. Character licenses are independent of the importer and
+must be reviewed before publishing renders or sharing any source asset.

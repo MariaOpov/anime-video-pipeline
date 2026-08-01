@@ -31,10 +31,10 @@ MOUTH_SHAPES = {
 POSE_BONE_ALIASES = {
     "spine": ("spine", "upper_body", "上半身", "上半身2"),
     "head": ("head", "頭"),
-    "arm.L": ("arm.L", "upper_arm.L", "左腕"),
-    "arm.R": ("arm.R", "upper_arm.R", "右腕"),
-    "leg.L": ("leg.L", "thigh.L", "左足"),
-    "leg.R": ("leg.R", "thigh.R", "右足"),
+    "arm.L": ("arm.L", "upper_arm.L", "左腕", "腕.L"),
+    "arm.R": ("arm.R", "upper_arm.R", "右腕", "腕.R"),
+    "leg.L": ("leg.L", "thigh.L", "左足", "足.L"),
+    "leg.R": ("leg.R", "thigh.R", "右足", "足.R"),
     "eyes": ("eyes", "eye", "両目"),
 }
 
@@ -67,6 +67,11 @@ def armature_for(character: str):
 
 
 def pose_bone_for(armature, alias: str):
+    mapped = armature.get(f"pipeline_bone_{alias.replace('.', '_')}")
+    if mapped:
+        bone = armature.pose.bones.get(str(mapped))
+        if bone:
+            return bone
     candidates = POSE_BONE_ALIASES.get(alias, (alias,))
     for name in candidates:
         bone = armature.pose.bones.get(name)
@@ -147,6 +152,7 @@ def eye_objects_for(character: str):
 
 def blink_shape_targets(character: str):
     armature = armature_for(character)
+    mapped_blink = armature.get("pipeline_morph_blink")
     targets = []
     for obj in bpy.data.objects:
         if obj.type != "MESH" or not obj.data.shape_keys:
@@ -160,7 +166,7 @@ def blink_shape_targets(character: str):
         if not belongs:
             continue
         for block in obj.data.shape_keys.key_blocks:
-            if block.name.casefold() in BLINK_SHAPE_ALIASES:
+            if (mapped_blink and block.name == mapped_blink) or block.name.casefold() in BLINK_SHAPE_ALIASES:
                 targets.append(block)
     return targets
 
@@ -252,7 +258,7 @@ def mouth_material():
     return material
 
 
-def create_mouth(character: str):
+def create_fallback_mouth(character: str):
     existing = bpy.data.objects.get(f"{character}_Mouth")
     if existing and existing.type == "MESH" and existing.data.shape_keys:
         return existing
@@ -298,16 +304,43 @@ def create_mouth(character: str):
     return mouth
 
 
-def insert_mouth_pose(mouth, frame: int, active_shape: str) -> None:
-    keys = mouth.data.shape_keys.key_blocks
-    if active_shape not in keys:
-        active_shape = "neutral" if "neutral" in keys else "closed"
-    for name in MOUTH_SHAPES:
-        if name not in keys:
-            continue
-        key = keys[name]
-        key.value = 1.0 if name == active_shape else 0.0
-        key.keyframe_insert(data_path="value", frame=frame, group="PIPE_Mouth")
+def mouth_targets_for(character: str):
+    armature = armature_for(character)
+    requested = {
+        shape: armature.get(f"pipeline_morph_{shape}")
+        for shape in ("A", "I", "U", "E", "O")
+    }
+    targets = []
+    if any(requested.values()):
+        for obj in bpy.data.objects:
+            if obj.type != "MESH" or not obj.data.shape_keys:
+                continue
+            belongs = obj.parent == armature or obj.name.casefold().startswith(character.casefold())
+            belongs = belongs or any(
+                modifier.type == "ARMATURE" and modifier.object == armature
+                for modifier in obj.modifiers
+            )
+            if not belongs:
+                continue
+            keys = obj.data.shape_keys.key_blocks
+            mapping = {shape: name for shape, name in requested.items() if name and name in keys}
+            if mapping:
+                targets.append((obj, mapping))
+    if targets:
+        return targets
+    fallback = create_fallback_mouth(character)
+    return [(fallback, {shape: shape for shape in ("A", "I", "U", "E", "O")})]
+
+
+def insert_mouth_pose(targets, frame: int, active_shape: str) -> None:
+    for obj, mapping in targets:
+        keys = obj.data.shape_keys.key_blocks
+        for shape, name in mapping.items():
+            key = keys.get(name)
+            if not key:
+                continue
+            key.value = 1.0 if shape == active_shape else 0.0
+            key.keyframe_insert(data_path="value", frame=frame, group="PIPE_Mouth")
 
 
 def animate_dialogue(manifest: dict) -> tuple[int, int]:
@@ -316,7 +349,7 @@ def animate_dialogue(manifest: dict) -> tuple[int, int]:
     applied_cues = 0
     for line in manifest["dialogue"]:
         character = line["character"]
-        mouth = targets.setdefault(character, create_mouth(character))
+        mouths = targets.setdefault(character, mouth_targets_for(character))
         events = {int(line["start_frame"]): "closed", int(line["end_frame"]): "closed"}
         for cue in line["mouth_cues"]:
             start = int(line["start_frame"]) + round(float(cue["start"]) * fps)
@@ -328,8 +361,62 @@ def animate_dialogue(manifest: dict) -> tuple[int, int]:
             events.setdefault(end, "closed")
             applied_cues += 1
         for frame, shape in sorted(events.items()):
-            insert_mouth_pose(mouth, frame, shape)
-    return len(targets), applied_cues
+            insert_mouth_pose(mouths, frame, shape)
+    return sum(len(items) for items in targets.values()), applied_cues
+
+
+def _character_objects(character: str):
+    armatures = [obj for obj in bpy.data.objects
+                 if obj.type == "ARMATURE" and obj.get("pipeline_character") == character]
+    owned = set(armatures)
+    for obj in bpy.data.objects:
+        parent = obj.parent
+        while parent:
+            if parent in armatures:
+                owned.add(obj)
+                break
+            parent = parent.parent
+        if obj.get("pipeline_mouth_target") == character:
+            owned.add(obj)
+    return owned
+
+
+def load_character_assets(project: Path, manifest: dict) -> tuple[int, int, int, int, int]:
+    contract = manifest.get("character_assets", {})
+    characters = contract.get("characters", []) if contract.get("enabled", False) else []
+    loaded = 0
+    resolved_bones = 0
+    resolved_mouth = 0
+    missing_textures = 0
+    license_warnings = 0
+    for item in characters:
+        if not item.get("ready", False):
+            raise RuntimeError(f"Production character is not ready: {item['character']}")
+        cache = (project / item["cache_blend"]).resolve()
+        if not cache.is_file():
+            raise RuntimeError(f"Production character cache is missing: {cache}")
+        for obj in _character_objects(item["character"]):
+            bpy.data.objects.remove(obj, do_unlink=True)
+        with bpy.data.libraries.load(str(cache), link=False) as (data_from, data_to):
+            if item["cache_collection"] not in data_from.collections:
+                raise RuntimeError(
+                    f"Character cache collection is missing: {item['cache_collection']}"
+                )
+            data_to.collections = [item["cache_collection"]]
+        collection = data_to.collections[0]
+        if not collection:
+            raise RuntimeError(f"Failed to append character collection: {item['character']}")
+        bpy.context.scene.collection.children.link(collection)
+        armature = armature_for(item["character"])
+        if armature.name != item["armature_object"]:
+            raise RuntimeError(f"Character armature identity mismatch: {item['character']}")
+        loaded += 1
+        resolved_bones += int(item["resolved_bone_count"])
+        resolved_mouth += int(item["resolved_mouth_morph_count"])
+        missing_textures += int(item["missing_texture_count"])
+        license_warnings += int(item["license_warning"])
+    bpy.context.view_layer.update()
+    return loaded, resolved_bones, resolved_mouth, missing_textures, license_warnings
 
 
 def camera_collection():
@@ -544,7 +631,10 @@ def write_report(project: Path, manifest: dict, *, camera_count: int, audio_coun
                  placement_keyframes: int, camera_movements: int,
                  camera_keyframes: int, framing_risks: int,
                  camera_collision_risks: int, continuity_violations: int,
-                 blocking_conflicts: int, rendered: bool) -> Path:
+                 blocking_conflicts: int, production_characters: int,
+                 production_characters_loaded: int, resolved_character_bones: int,
+                 resolved_character_mouth_morphs: int, character_texture_missing: int,
+                 character_license_warnings: int, rendered: bool) -> Path:
     output_scene = (project / manifest["output_scene"]).resolve()
     preview = (project / manifest["preview_video"]).resolve()
     report = {
@@ -572,6 +662,12 @@ def write_report(project: Path, manifest: dict, *, camera_count: int, audio_coun
         "camera_collision_risk_count": camera_collision_risks,
         "continuity_violation_count": continuity_violations,
         "blocking_conflict_count": blocking_conflicts,
+        "production_character_count": production_characters,
+        "production_character_loaded_count": production_characters_loaded,
+        "resolved_character_bone_alias_count": resolved_character_bones,
+        "resolved_character_mouth_morph_count": resolved_character_mouth_morphs,
+        "character_texture_missing_count": character_texture_missing,
+        "character_license_warning_count": character_license_warnings,
         "scene_file": output_scene.relative_to(project).as_posix(),
         "preview_video": preview.relative_to(project).as_posix() if rendered else None,
     }
@@ -588,6 +684,10 @@ def main() -> None:
     project = args.project.resolve()
     manifest = load_json(project / "generated" / "phase3_manifest.json")
     preview = configure_scene(project, manifest)
+    character_assets = manifest.get("character_assets", {})
+    (production_characters_loaded, resolved_character_bones,
+     resolved_character_mouth_morphs, character_texture_missing,
+     character_license_warnings) = load_character_assets(project, manifest)
     camera_count, camera_movements, camera_keyframes = assemble_cameras(manifest)
     audio_count = assemble_audio(project, manifest)
     performance_targets, performance_clips, gestures, pose_keyframes, skipped_bones = (
@@ -625,6 +725,12 @@ def main() -> None:
         camera_collision_risks=int(blocking.get("camera_collision_risk_count", 0)),
         continuity_violations=int(blocking.get("continuity_violation_count", 0)),
         blocking_conflicts=int(blocking.get("blocking_conflict_count", 0)),
+        production_characters=int(character_assets.get("configured_count", 0)),
+        production_characters_loaded=production_characters_loaded,
+        resolved_character_bones=resolved_character_bones,
+        resolved_character_mouth_morphs=resolved_character_mouth_morphs,
+        character_texture_missing=character_texture_missing,
+        character_license_warnings=character_license_warnings,
     )
     print(
         f"PHASE 3 BLENDER COMPLETE: {camera_count} cameras, {audio_count} audio strips, "
@@ -636,6 +742,9 @@ def main() -> None:
         f"{direction.get('listener_reaction_count', 0)} listener reactions, "
         f"{len(blocking.get('shots', []))} blocking shots/{character_placements} placements, "
         f"{camera_movements} camera moves/{camera_keyframes} camera keys, "
+        f"{production_characters_loaded} production character(s), "
+        f"{resolved_character_bones} resolved bones/{resolved_character_mouth_morphs} mouth morphs, "
+        f"{character_texture_missing} missing character textures, "
         f"{blocking.get('framing_risk_count', 0)} framing risks, "
         f"{blocking.get('camera_collision_risk_count', 0)} camera collision risks, "
         f"{skipped_bones} skipped aliases, scene={output_scene}, "

@@ -17,7 +17,7 @@
     "run": {"type": "object"},
     "summary": {
       "type": "object",
-      "required": ["quality_gate_count", "passed_gate_count", "failed_gate_count", "scene_count", "shot_count", "unresolved_motion_count", "dialogue_count", "mouth_cue_count", "timing_warning_count", "performance_clip_count", "gesture_count", "pose_keyframe_count", "skipped_bone_alias_count", "dialogue_beat_count", "gaze_target_count", "gaze_keyframe_count", "blink_event_count", "blink_keyframe_count", "listener_reaction_count", "performance_conflict_count", "blocking_shot_count", "character_placement_count", "body_facing_count", "placement_keyframe_count", "camera_motion_count", "camera_keyframe_count", "framing_risk_count", "camera_collision_risk_count", "continuity_violation_count", "blocking_conflict_count", "duration_seconds", "output_size_bytes", "output_width", "output_height", "estimated_cost"],
+      "required": ["quality_gate_count", "passed_gate_count", "failed_gate_count", "scene_count", "shot_count", "unresolved_motion_count", "dialogue_count", "mouth_cue_count", "timing_warning_count", "performance_clip_count", "gesture_count", "pose_keyframe_count", "skipped_bone_alias_count", "dialogue_beat_count", "gaze_target_count", "gaze_keyframe_count", "blink_event_count", "blink_keyframe_count", "listener_reaction_count", "performance_conflict_count", "blocking_shot_count", "character_placement_count", "body_facing_count", "placement_keyframe_count", "camera_motion_count", "camera_keyframe_count", "framing_risk_count", "camera_collision_risk_count", "continuity_violation_count", "blocking_conflict_count", "production_character_count", "production_character_loaded_count", "resolved_character_bone_alias_count", "resolved_character_mouth_morph_count", "character_texture_missing_count", "character_asset_warning_count", "character_license_warning_count", "duration_seconds", "output_size_bytes", "output_width", "output_height", "estimated_cost"],
       "properties": {
         "quality_gate_count": {"type": "integer", "minimum": 1},
         "passed_gate_count": {"type": "integer", "minimum": 0},
@@ -49,6 +49,13 @@
         "camera_collision_risk_count": {"type": "integer", "minimum": 0},
         "continuity_violation_count": {"type": "integer", "minimum": 0},
         "blocking_conflict_count": {"type": "integer", "minimum": 0},
+        "production_character_count": {"type": "integer", "minimum": 0},
+        "production_character_loaded_count": {"type": "integer", "minimum": 0},
+        "resolved_character_bone_alias_count": {"type": "integer", "minimum": 0},
+        "resolved_character_mouth_morph_count": {"type": "integer", "minimum": 0},
+        "character_texture_missing_count": {"type": "integer", "minimum": 0},
+        "character_asset_warning_count": {"type": "integer", "minimum": 0},
+        "character_license_warning_count": {"type": "integer", "minimum": 0},
         "duration_seconds": {"type": "number", "minimum": 0},
         "output_size_bytes": {"type": "integer", "minimum": 0},
         "output_width": {"type": "integer", "minimum": 0},
