@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Anime Pipeline Studio</title>
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <div class="ambient ambient-one"></div>
+  <div class="ambient ambient-two"></div>
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-mark">AP</div>
+      <div>
+        <p class="eyebrow">LOCAL PRODUCTION SYSTEM</p>
+        <h1>Anime Pipeline <span>Studio</span></h1>
+      </div>
+    </div>
+    <div class="top-status">
+      <span id="project-chip" class="chip">Đang tải project…</span>
+      <span id="ollama-chip" class="chip chip-muted">Ollama: kiểm tra…</span>
+      <button id="refresh-button" class="icon-button" title="Làm mới">↻</button>
+    </div>
+  </header>
+
+  <main class="shell">
+    <aside class="sidebar panel">
+      <div class="sidebar-heading">
+        <p class="eyebrow">CONTROL DECK</p>
+        <h2>Điều khiển</h2>
+      </div>
+
+      <label class="field-label" for="preset">Render preset</label>
+      <select id="preset">
+        <option value="preview">Preview — nhanh</option>
+        <option value="balanced">Balanced</option>
+        <option value="final">Final — chất lượng</option>
+      </select>
+
+      <label class="toggle-row">
+        <span>
+          <strong>Fresh build</strong>
+          <small>Tạo lại TTS thay vì resume</small>
+        </span>
+        <input id="fresh-toggle" type="checkbox">
+      </label>
+
+      <div class="action-stack">
+        <button id="phase1-button" class="button button-secondary">
+          <span class="button-index">01</span>
+          Phân tích Phase 1
+        </button>
+        <button id="phase2-button" class="button button-secondary">
+          <span class="button-index">02</span>
+          Tạo thoại + lip-sync
+        </button>
+        <button id="run-all-button" class="button button-primary">
+          <span class="button-index">▶</span>
+          Run All 5 Phases
+        </button>
+      </div>
+
+      <div class="sidebar-note">
+        <span class="pulse"></span>
+        <p>Studio chỉ lắng nghe trên máy này. Không có API điều khiển từ xa.</p>
+      </div>
+    </aside>
+
+    <section class="workspace">
+      <section class="hero panel">
+        <div>
+          <p class="eyebrow">PHASE 6 · MOTION INTELLIGENCE</p>
+          <h2>Biến kịch bản thành chuyển động có kiểm soát.</h2>
+          <p>Soạn cảnh, tạo motion intent bằng AI hoặc rules, kiểm duyệt JSON rồi chạy toàn bộ xưởng sản xuất.</p>
+        </div>
+        <div class="hero-orbit" aria-hidden="true">
+          <div class="orbit orbit-a"></div>
+          <div class="orbit orbit-b"></div>
+          <div class="orbit-core">6</div>
+        </div>
+      </section>
+
+      <section class="metrics" aria-label="Production metrics">
+        <article class="metric panel">
+          <span>Quality gates</span>
+          <strong id="metric-gates">—</strong>
+          <small id="metric-gates-detail">Chưa có báo cáo</small>
+        </article>
+        <article class="metric panel">
+          <span>Shots</span>
+          <strong id="metric-shots">—</strong>
+          <small>Scene composition</small>
+        </article>
+        <article class="metric panel">
+          <span>Mouth cues</span>
+          <strong id="metric-cues">—</strong>
+          <small>Rhubarb timing</small>
+        </article>
+        <article class="metric panel">
+          <span>External cost</span>
+          <strong id="metric-cost">$0</strong>
+          <small>Offline-first</small>
+        </article>
+      </section>
+
+      <section class="editor-grid">
+        <article class="editor-card panel">
+          <div class="card-header">
+            <div>
+              <p class="eyebrow">SOURCE</p>
+              <h3>Script Editor</h3>
+            </div>
+            <div class="header-actions">
+              <span id="script-state" class="state-text">Đã đồng bộ</span>
+              <button id="save-script-button" class="button button-small">Lưu script</button>
+            </div>
+          </div>
+          <textarea id="script-editor" class="code-editor script-editor" spellcheck="false" placeholder="[Scene 1 — Location]\nAiko: Xin chào…"></textarea>
+          <div class="editor-footer">
+            <span id="script-count">0 ký tự</span>
+            <span>UTF-8 · script.txt</span>
+          </div>
+        </article>
+
+        <article class="editor-card panel">
+          <div class="card-header">
+            <div>
+              <p class="eyebrow">VALIDATED CONTRACT</p>
+              <h3>Motion Intent JSON</h3>
+            </div>
+            <span id="motion-source" class="chip chip-muted">Chưa tạo</span>
+          </div>
+          <textarea id="motion-editor" class="code-editor" spellcheck="false" placeholder="Motion plan sẽ xuất hiện tại đây…"></textarea>
+          <div class="motion-actions">
+            <button id="rules-button" class="button button-secondary button-small">Generate Rules</button>
+            <button id="ai-button" class="button button-accent button-small">Generate with Ollama</button>
+            <button id="save-motion-button" class="button button-small">Validate & Save</button>
+          </div>
+          <div id="motion-warnings" class="warning-box hidden"></div>
+        </article>
+      </section>
+
+      <section class="lower-grid">
+        <article class="console-card panel">
+          <div class="card-header">
+            <div>
+              <p class="eyebrow">LIVE PIPELINE</p>
+              <h3>Production Console</h3>
+            </div>
+            <span id="job-chip" class="chip chip-muted">Idle</span>
+          </div>
+          <pre id="console-output" class="console-output"><span>Studio ready. Chọn một tác vụ để bắt đầu.</span></pre>
+        </article>
+
+        <article class="preview-card panel">
+          <div class="card-header">
+            <div>
+              <p class="eyebrow">DELIVERY</p>
+              <h3>Final Preview</h3>
+            </div>
+            <button id="reload-video-button" class="icon-button" title="Tải lại video">↻</button>
+          </div>
+          <div id="video-empty" class="video-empty">
+            <div class="play-symbol">▶</div>
+            <p>Chưa tìm thấy final_video.mp4</p>
+          </div>
+          <video id="final-video" class="final-video hidden" controls preload="metadata"></video>
+        </article>
+      </section>
+
+      <section class="quality-card panel">
+        <div class="card-header">
+          <div>
+            <p class="eyebrow">RELEASE AUDIT</p>
+            <h3>Quality Gates</h3>
+          </div>
+          <span id="quality-chip" class="chip chip-muted">No report</span>
+        </div>
+        <div id="quality-list" class="quality-list">
+          <p class="empty-copy">Chạy toàn bộ pipeline để tạo production report.</p>
+        </div>
+      </section>
+    </section>
+  </main>
+
+  <div id="toast" class="toast hidden" role="status"></div>
+  <script src="/static/app.js" defer></script>
+</body>
+</html>

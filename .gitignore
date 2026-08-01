@@ -28,3 +28,6 @@ projects/*/subtitles/*.vtt
 # Generated Phase 5 run and production reports
 projects/*/generated/phase5_run_record.json
 projects/*/generated/production_report.json
+
+# Generated Phase 6 AI/rules motion intent
+projects/*/generated/motion_intent_plan.json

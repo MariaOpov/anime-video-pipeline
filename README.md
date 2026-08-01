@@ -1,4 +1,4 @@
-# Anime Video Pipeline — Phase 5
+# Anime Video Pipeline — Phase 6
 
 A Windows-first foundation for an offline, reusable anime production pipeline.
 Phase 1 turns a text script into validated screenplay and shot-list JSON, indexes
@@ -9,12 +9,17 @@ assembles those contracts inside Blender as shot cameras, synchronized audio,
 and animated mouth shape keys. Phase 4 generates subtitles, normalizes audio,
 and exports a verified delivery MP4 through a local FFmpeg runtime. Phase 5
 orchestrates the entire production with one command and refuses release unless
-every configured quality gate passes.
+every configured quality gate passes. Phase 6 adds a local web Studio and
+schema-constrained Ollama motion planning, while preserving the deterministic
+asset resolver as the final authority.
 
 ## Architecture
 
 ```text
 script.txt + project.yaml
+          |
+          v
+ Phase 6 Studio -----------> Script editor / live logs / video / QA
           |
           v
  Configuration validation
@@ -24,6 +29,8 @@ script.txt + project.yaml
           |                    Rule analyzer (fallback)
           v
  JSON Schema validation
+          |
+          +----> Motion intent ----> Ollama or rules ----> Motion selector
           |
           +----> Asset index ----> License warnings
           |
@@ -110,6 +117,18 @@ and FFmpeg dependencies first. Resume is enabled by default; `-Fresh` forces
 Phase 1–2 regeneration. Rendering requires the explicit `-Render` switch so an
 expensive Blender job cannot start accidentally.
 
+Launch the local production Studio:
+
+```powershell
+.\setup_phase6.ps1
+.\run_studio.ps1
+```
+
+The Studio opens on `http://127.0.0.1:8000` and provides a script editor,
+schema-validated motion JSON editor, Ollama/rules generation, allowlisted
+pipeline controls, incremental logs, final-video playback, and all 27 release
+gates. It is loopback-only and does not expose remote command execution.
+
 Optional local LLM:
 
 ```powershell
@@ -170,6 +189,16 @@ Phase 5 checks all Phase 1–4 contracts, enforces configurable warning limits,
 compares Blender counts to the manifest, and verifies final subtitles, audio,
 duration, dimensions, and file size. See `PHASE5.md` for the full release gate.
 
+## Phase 6 outputs
+
+- `generated/motion_intent_plan.json`: AI/rules semantic motion contract.
+- Local Studio at `http://127.0.0.1:8000` with script, JSON, logs, video, and QA.
+
+The motion-intent plan is signed with the screenplay SHA-256 and must preserve
+every scene, shot, and character identity. It contains no executable code or
+asset paths. The existing motion selector resolves its action tags to trusted
+local motion assets. See `PHASE6.md` for the workflow and API.
+
 ## Asset metadata
 
 Place one `.asset.yaml` sidecar anywhere below an asset-library directory. The
@@ -184,6 +213,7 @@ python run_pipeline.py --project projects/demo --preset preview
 python run_pipeline.py --project projects/demo --resume
 python -m unittest discover -s tests -v
 .\run_all.ps1 -Render
+.\run_studio.ps1
 ```
 
 `--dry-run` validates inputs and reports planned work without writing generated
@@ -192,5 +222,5 @@ production outputs. Use `--verbose` for console debug messages.
 ## Possible extensions
 
 1. Optional ComfyUI backgrounds and image-to-video inserts.
-2. Improved emotional body, eye, and camera animation.
-3. CI smoke tests with cached tool runtimes.
+2. Import and retarget a production MMD character/motion library.
+3. Improved emotional body, eye, and camera animation.
