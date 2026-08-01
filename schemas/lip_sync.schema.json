@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["line_id", "character", "audio_path", "duration_seconds", "mouth_cues"],
+  "properties": {
+    "line_id": {"type": "string"}, "character": {"type": "string"},
+    "audio_path": {"type": "string"},
+    "duration_seconds": {"type": "number", "minimum": 0},
+    "mouth_cues": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["start", "end", "source_shape", "mouth_shape"],
+        "properties": {
+          "start": {"type": "number", "minimum": 0},
+          "end": {"type": "number", "exclusiveMinimum": 0},
+          "source_shape": {"type": "string", "pattern": "^[A-HX]$"},
+          "mouth_shape": {"type": "string", "minLength": 1}
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}
+

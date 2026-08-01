@@ -6,7 +6,14 @@ projects/*/logs/*.log
 projects/*/renders/
 projects/*/output/
 
-
 # Blender backup files
 *.blend1
 *.blend2
+
+# Locally downloaded Phase 2 tools and generated speech
+tools/piper_voices/
+tools/rhubarb/
+projects/*/dialogue/*.wav
+projects/*/dialogue/*.txt
+projects/*/dialogue/recorded/
+projects/*/lip_sync/*.json

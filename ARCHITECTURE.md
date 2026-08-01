@@ -15,8 +15,9 @@
 2. **Planning layer** — screenplay analysis, schema validation, shot timing.
 3. **Asset layer** — metadata index, licensing checks, compatibility search.
 4. **Animation plan** — motion selection and deterministic fallback chains.
-5. **Blender layer (Phase 3)** — import, retarget, face animation, lighting, cameras.
-6. **Media layer (Phases 2/4)** — voice, lip-sync, subtitles, audio mix, FFmpeg.
+5. **Dialogue layer (Phase 2)** — Piper/recorded WAV, normalization, timing, Rhubarb cues.
+6. **Blender layer (Phase 3)** — import, retarget, face animation, lighting, cameras.
+7. **Media layer (Phase 4)** — subtitles, audio mix, and FFmpeg export.
 7. **Operations layer** — logs, atomic outputs, stage state, dry-run, resume.
 
 ## Project directory contract
@@ -48,9 +49,9 @@ project/
 └── logs/
 ```
 
-Only the first four generated JSON files and pipeline state are produced in
-Phase 1. Later phases consume these stable contracts instead of reparsing raw
-script text inside Blender.
+Phase 2 adds `dialogue_timeline.json`, one WAV and transcript per line, and one
+validated lip-sync JSON per line. Later phases consume these stable contracts
+instead of reparsing raw script text inside Blender.
 
 ## Failure boundaries
 
@@ -67,4 +68,3 @@ Asset paths are resolved below configured library roots; metadata that attempts
 to escape a root is ignored. Each asset records source, creator, commercial-use,
 modification, and attribution status. Unknown licensing is surfaced rather than
 silently assumed to be safe.
-

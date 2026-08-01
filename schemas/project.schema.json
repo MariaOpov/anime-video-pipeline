@@ -8,7 +8,7 @@
     "preset": {"enum": ["preview", "balanced", "final"]},
     "language": {"type": "string", "minLength": 2},
     "subtitle_language": {"type": "string"},
-    "render_engine": {"enum": ["BLENDER_EEVEE_NEXT", "BLENDER_WORKBENCH"]},
+    "render_engine": {"enum": ["BLENDER_EEVEE", "BLENDER_EEVEE_NEXT", "BLENDER_WORKBENCH"]},
     "render_device": {"enum": ["CPU", "GPU", "AUTO"]},
     "output": {
       "type": "object",
@@ -33,6 +33,44 @@
       },
       "additionalProperties": true
     },
+    "phase2": {
+      "type": "object",
+      "required": ["enabled", "piper_data_dir", "rhubarb_executable", "voices"],
+      "properties": {
+        "enabled": {"type": "boolean"},
+        "piper_data_dir": {"type": "string"},
+        "rhubarb_executable": {"type": "string"},
+        "rhubarb_recognizer": {"enum": ["pocketSphinx", "phonetic"]},
+        "default_voice": {"type": "string"},
+        "silence_before_seconds": {"type": "number", "minimum": 0, "maximum": 5},
+        "silence_after_seconds": {"type": "number", "minimum": 0, "maximum": 5},
+        "dialogue_gap_seconds": {"type": "number", "minimum": 0, "maximum": 5},
+        "normalization_peak": {"type": "number", "exclusiveMinimum": 0, "maximum": 1},
+        "voices": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": {
+            "type": "object", "required": ["model"],
+            "properties": {
+              "model": {"type": "string", "minLength": 1},
+              "data_dir": {"type": "string"},
+              "speaker": {"type": "integer", "minimum": 0},
+              "length_scale": {"type": "number", "exclusiveMinimum": 0},
+              "noise_scale": {"type": "number", "minimum": 0},
+              "noise_w_scale": {"type": "number", "minimum": 0},
+              "volume": {"type": "number", "minimum": 0}
+            },
+            "additionalProperties": false
+          }
+        },
+        "mouth_morph_mapping": {
+          "type": "object",
+          "propertyNames": {"pattern": "^[A-HX]$"},
+          "additionalProperties": {"type": "string", "minLength": 1}
+        }
+      },
+      "additionalProperties": false
+    },
     "motion_fallbacks": {
       "type": "object",
       "additionalProperties": {"type": "array", "items": {"type": "string"}}
@@ -40,4 +78,3 @@
   },
   "additionalProperties": true
 }
-

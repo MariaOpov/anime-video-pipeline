@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["fps", "total_duration_seconds", "lines", "warnings"],
+  "properties": {
+    "fps": {"type": "integer", "minimum": 1},
+    "total_duration_seconds": {"type": "number", "minimum": 0},
+    "warnings": {"type": "array", "items": {"type": "string"}},
+    "lines": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["line_id", "scene_id", "shot_id", "character", "text", "emotion", "voice_id", "audio_path", "start_seconds", "end_seconds", "duration_seconds", "start_frame", "end_frame", "recorded_override"],
+        "properties": {
+          "line_id": {"type": "string"}, "scene_id": {"type": "string"},
+          "shot_id": {"type": "string"}, "character": {"type": "string"},
+          "text": {"type": "string"}, "emotion": {"type": "string"},
+          "voice_id": {"type": "string"}, "audio_path": {"type": "string"},
+          "start_seconds": {"type": "number", "minimum": 0},
+          "end_seconds": {"type": "number", "exclusiveMinimum": 0},
+          "duration_seconds": {"type": "number", "exclusiveMinimum": 0},
+          "start_frame": {"type": "integer", "minimum": 1},
+          "end_frame": {"type": "integer", "minimum": 1},
+          "recorded_override": {"type": "boolean"}
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}
+
