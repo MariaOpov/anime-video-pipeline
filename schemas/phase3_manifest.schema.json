@@ -1,9 +1,9 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "type": "object",
-  "required": ["version", "project_name", "fps", "frame_start", "frame_end", "base_scene", "output_scene", "preview_video", "render", "camera", "shots", "dialogue", "summary"],
+  "required": ["version", "project_name", "fps", "frame_start", "frame_end", "base_scene", "output_scene", "preview_video", "render", "camera", "performance", "shots", "dialogue", "summary"],
   "properties": {
-    "version": {"const": 1},
+    "version": {"const": 2},
     "project_name": {"type": "string", "minLength": 1},
     "fps": {"type": "integer", "minimum": 1},
     "frame_start": {"type": "integer", "minimum": 1},
@@ -20,6 +20,39 @@
       }, "additionalProperties": false
     },
     "camera": {"type": "object"},
+    "performance": {
+      "type": "object",
+      "required": ["enabled", "source", "amplitude_scale", "clips"],
+      "properties": {
+        "enabled": {"type": "boolean"},
+        "source": {"enum": [null, "rules", "ollama", "manual"]},
+        "amplitude_scale": {"type": "number", "minimum": 0.1, "maximum": 3.0},
+        "clips": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["scene_id", "shot_id", "character", "start_frame", "end_frame", "action", "emotion", "intensity", "gestures", "look_at"],
+            "properties": {
+              "scene_id": {"type": "string", "minLength": 1},
+              "shot_id": {"type": "string", "minLength": 1},
+              "character": {"type": "string", "minLength": 1},
+              "start_frame": {"type": "integer", "minimum": 1},
+              "end_frame": {"type": "integer", "minimum": 1},
+              "action": {"type": "string", "pattern": "^[a-z][a-z0-9_]{1,63}$"},
+              "emotion": {"enum": ["neutral", "sad", "angry", "surprised", "happy", "fearful", "determined"]},
+              "intensity": {"type": "number", "minimum": 0, "maximum": 1},
+              "gestures": {
+                "type": "array", "maxItems": 4, "uniqueItems": true,
+                "items": {"enum": ["look_down", "look_up", "head_tilt", "nod", "shake_head", "small_hand_motion", "open_hand", "point", "step_forward", "step_back", "turn_left", "turn_right", "breathe", "wind_sway"]}
+              },
+              "look_at": {"type": ["string", "null"]}
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    },
     "shots": {
       "type": "array", "minItems": 1,
       "items": {
@@ -49,11 +82,13 @@
       }
     },
     "summary": {
-      "type": "object", "required": ["shot_count", "dialogue_count", "mouth_cue_count"],
+      "type": "object", "required": ["shot_count", "dialogue_count", "mouth_cue_count", "performance_clip_count", "gesture_count"],
       "properties": {
         "shot_count": {"type": "integer", "minimum": 1},
         "dialogue_count": {"type": "integer", "minimum": 0},
-        "mouth_cue_count": {"type": "integer", "minimum": 0}
+        "mouth_cue_count": {"type": "integer", "minimum": 0},
+        "performance_clip_count": {"type": "integer", "minimum": 0},
+        "gesture_count": {"type": "integer", "minimum": 0}
       }, "additionalProperties": false
     }
   },

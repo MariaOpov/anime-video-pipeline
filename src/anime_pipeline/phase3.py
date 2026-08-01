@@ -8,6 +8,7 @@ from typing import Any
 
 from .config import ProjectConfig
 from .io_utils import atomic_write_json, load_json, validate
+from .motion_ai import validate_motion_intent
 
 
 def seconds_to_frame(seconds: float, fps: int) -> int:
@@ -67,6 +68,8 @@ class Phase3Planner:
                 "target": camera.get("target"),
             })
 
+        performance = self._build_performance(shots)
+
         dialogue = []
         cue_total = 0
         for line in timeline["lines"]:
@@ -99,7 +102,7 @@ class Phase3Planner:
                             float(timeline.get("total_duration_seconds", 0)))
         output = self.config.data["output"]
         manifest = {
-            "version": 1, "project_name": self.config.data["project_name"],
+            "version": 2, "project_name": self.config.data["project_name"],
             "fps": self.config.fps, "frame_start": 1,
             "frame_end": max(1, math.ceil(total_seconds * self.config.fps)),
             "base_scene": base_scene.relative_to(self.config.project_dir).as_posix(),
@@ -110,10 +113,14 @@ class Phase3Planner:
                 "width": int(output["width"]), "height": int(output["height"]),
                 "resolution_percentage": int(self.settings.get("resolution_percentage", 100)),
             },
-            "camera": self.settings.get("camera", {}),
+            "camera": self.settings.get("camera", {}), "performance": performance,
             "shots": shots, "dialogue": dialogue,
             "summary": {"shot_count": len(shots), "dialogue_count": len(dialogue),
-                        "mouth_cue_count": cue_total},
+                        "mouth_cue_count": cue_total,
+                        "performance_clip_count": len(performance["clips"]),
+                        "gesture_count": sum(
+                            len(clip["gestures"]) for clip in performance["clips"]
+                        )},
         }
         validate(manifest, self.schemas / "phase3_manifest.schema.json", "Phase 3 manifest")
         return manifest
@@ -139,3 +146,59 @@ class Phase3Planner:
         if schema:
             validate(payload, schema, label)
         return payload
+
+    def _build_performance(self, shots: list[dict[str, Any]]) -> dict[str, Any]:
+        settings = self.config.data.get("phase6", {}).get("procedural_gestures", {})
+        enabled = bool(settings.get("enabled", True))
+        amplitude = float(settings.get("amplitude_scale", 1.0))
+        result: dict[str, Any] = {
+            "enabled": enabled, "source": None,
+            "amplitude_scale": amplitude, "clips": [],
+        }
+        if not enabled:
+            return result
+
+        motion_plan_path = self.config.generated_dir / "motion_plan.json"
+        if not motion_plan_path.is_file():
+            return result
+        motion_plan = load_json(motion_plan_path)
+        intent_relative = motion_plan.get("intent_plan")
+        if not intent_relative:
+            return result
+        intent_path = (self.config.project_dir / str(intent_relative)).resolve()
+        try:
+            intent_path.relative_to(self.config.project_dir.resolve())
+        except ValueError as exc:
+            raise ValueError("motion intent path must stay inside the project directory") from exc
+        if not intent_path.is_file():
+            raise ValueError(f"Motion intent referenced by motion plan is missing: {intent_path}")
+
+        screenplay = self._validated_json(
+            self.config.generated_dir / "screenplay.json",
+            self.schemas / "screenplay.schema.json", "Phase 1 screenplay",
+        )
+        intent = load_json(intent_path)
+        validate_motion_intent(intent, screenplay, self.schemas / "motion_intent.schema.json")
+        shot_frames = {
+            (shot["scene_id"], shot["shot_id"]): (shot["start_frame"], shot["end_frame"])
+            for shot in shots
+        }
+        clips = []
+        for shot in intent["shots"]:
+            identity = (shot["scene_id"], shot["shot_id"])
+            if identity not in shot_frames:
+                raise ValueError(f"Motion intent references unknown Phase 3 shot: {shot['shot_id']}")
+            start_frame, end_frame = shot_frames[identity]
+            for character in shot["characters"]:
+                clips.append({
+                    "scene_id": shot["scene_id"], "shot_id": shot["shot_id"],
+                    "character": character["name"], "start_frame": start_frame,
+                    "end_frame": end_frame, "action": character["action"],
+                    "emotion": character["emotion"],
+                    "intensity": float(character["intensity"]),
+                    "gestures": list(character["gestures"]),
+                    "look_at": character["look_at"],
+                })
+        result["source"] = intent["source"]
+        result["clips"] = clips
+        return result

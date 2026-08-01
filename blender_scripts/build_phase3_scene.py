@@ -16,11 +16,25 @@ from pathlib import Path
 import bpy
 from mathutils import Matrix, Vector
 
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "src"))
+
+from anime_pipeline.gestures import build_pose_keyframes  # noqa: E402
+
 
 MOUTH_SHAPES = {
     "closed": (1.00, 0.16), "neutral": (1.00, 0.35),
     "A": (0.80, 1.45), "I": (1.55, 0.42), "U": (0.62, 0.92),
     "E": (1.30, 0.68), "O": (0.72, 1.22),
+}
+
+POSE_BONE_ALIASES = {
+    "spine": ("spine", "upper_body", "上半身", "上半身2"),
+    "head": ("head", "頭"),
+    "arm.L": ("arm.L", "upper_arm.L", "左腕"),
+    "arm.R": ("arm.R", "upper_arm.R", "右腕"),
+    "leg.L": ("leg.L", "thigh.L", "左足"),
+    "leg.R": ("leg.R", "thigh.R", "右足"),
 }
 
 
@@ -47,6 +61,79 @@ def armature_for(character: str):
         if obj and obj.type == "ARMATURE":
             return obj
     raise RuntimeError(f"No armature found for character: {character}")
+
+
+def pose_bone_for(armature, alias: str):
+    candidates = POSE_BONE_ALIASES.get(alias, (alias,))
+    for name in candidates:
+        bone = armature.pose.bones.get(name)
+        if bone:
+            return bone
+    lowered = {bone.name.casefold(): bone for bone in armature.pose.bones}
+    for name in candidates:
+        if name.casefold() in lowered:
+            return lowered[name.casefold()]
+    return None
+
+
+def look_direction(armature, target_name: str | None) -> float:
+    if not target_name:
+        return 0.0
+    try:
+        target = armature_for(target_name)
+    except RuntimeError:
+        return 0.0
+    delta = target.matrix_world.translation.x - armature.matrix_world.translation.x
+    if abs(delta) < 0.001:
+        return 0.0
+    return 1.0 if delta > 0 else -1.0
+
+
+def animate_performances(manifest: dict) -> tuple[int, int, int, int, int]:
+    settings = manifest.get("performance", {})
+    clips = settings.get("clips", []) if settings.get("enabled", False) else []
+    if not clips:
+        return 0, 0, 0, 0, 0
+    amplitude = float(settings.get("amplitude_scale", 1.0))
+    characters = sorted({clip["character"] for clip in clips})
+    armatures = {character: armature_for(character) for character in characters}
+    actions = {}
+    for character, armature in armatures.items():
+        armature.animation_data_create()
+        action = bpy.data.actions.new(f"PIPE_{character}_ProceduralPerformance")
+        armature.animation_data.action = action
+        actions[character] = action
+
+    inserted = 0
+    skipped_bones: set[tuple[str, str]] = set()
+    for clip in clips:
+        character = clip["character"]
+        armature = armatures[character]
+        direction = look_direction(armature, clip.get("look_at"))
+        for keyframe in build_pose_keyframes(
+            clip, look_direction=direction, amplitude_scale=amplitude
+        ):
+            for alias, rotation in keyframe["rotations"].items():
+                bone = pose_bone_for(armature, alias)
+                if not bone:
+                    skipped_bones.add((character, alias))
+                    continue
+                bone.rotation_mode = "XYZ"
+                bone.rotation_euler = rotation
+                bone.keyframe_insert(
+                    data_path="rotation_euler", frame=keyframe["frame"],
+                    group=f"PIPE_{alias}",
+                )
+                inserted += 1
+
+    for action in actions.values():
+        for curve in getattr(action, "fcurves", []):
+            for point in curve.keyframe_points:
+                point.interpolation = "BEZIER"
+                point.handle_left_type = "AUTO_CLAMPED"
+                point.handle_right_type = "AUTO_CLAMPED"
+    gesture_count = sum(len(clip.get("gestures", [])) for clip in clips)
+    return len(armatures), len(clips), gesture_count, inserted, len(skipped_bones)
 
 
 def mouth_material():
@@ -256,7 +343,9 @@ def configure_scene(project: Path, manifest: dict) -> Path:
 
 
 def write_report(project: Path, manifest: dict, *, camera_count: int, audio_count: int,
-                 mouth_targets: int, mouth_cues: int, rendered: bool) -> Path:
+                 mouth_targets: int, mouth_cues: int, performance_targets: int,
+                 performance_clips: int, gestures: int, pose_keyframes: int,
+                 skipped_bones: int, rendered: bool) -> Path:
     output_scene = (project / manifest["output_scene"]).resolve()
     preview = (project / manifest["preview_video"]).resolve()
     report = {
@@ -264,6 +353,10 @@ def write_report(project: Path, manifest: dict, *, camera_count: int, audio_coun
         "frame_start": manifest["frame_start"], "frame_end": manifest["frame_end"],
         "camera_count": camera_count, "audio_strip_count": audio_count,
         "mouth_target_count": mouth_targets, "mouth_cue_count": mouth_cues,
+        "performance_target_count": performance_targets,
+        "performance_clip_count": performance_clips,
+        "gesture_count": gestures, "pose_keyframe_count": pose_keyframes,
+        "skipped_bone_alias_count": skipped_bones,
         "scene_file": output_scene.relative_to(project).as_posix(),
         "preview_video": preview.relative_to(project).as_posix() if rendered else None,
     }
@@ -282,6 +375,9 @@ def main() -> None:
     preview = configure_scene(project, manifest)
     camera_count = assemble_cameras(manifest)
     audio_count = assemble_audio(project, manifest)
+    performance_targets, performance_clips, gestures, pose_keyframes, skipped_bones = (
+        animate_performances(manifest)
+    )
     mouth_targets, mouth_cues = animate_dialogue(manifest)
 
     output_scene = (project / manifest["output_scene"]).resolve()
@@ -293,10 +389,14 @@ def main() -> None:
     report = write_report(
         project, manifest, camera_count=camera_count, audio_count=audio_count,
         mouth_targets=mouth_targets, mouth_cues=mouth_cues, rendered=args.render,
+        performance_targets=performance_targets, performance_clips=performance_clips,
+        gestures=gestures, pose_keyframes=pose_keyframes, skipped_bones=skipped_bones,
     )
     print(
         f"PHASE 3 BLENDER COMPLETE: {camera_count} cameras, {audio_count} audio strips, "
-        f"{mouth_cues} mouth cues, scene={output_scene}, "
+        f"{mouth_cues} mouth cues, {performance_clips} performance clips, "
+        f"{gestures} gestures, {pose_keyframes} pose keyframes, "
+        f"{skipped_bones} skipped bone aliases, scene={output_scene}, "
         f"preview={preview if args.render else 'not rendered'}, report={report}"
     )
 

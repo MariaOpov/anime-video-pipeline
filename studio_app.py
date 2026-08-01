@@ -16,6 +16,7 @@ from pydantic import BaseModel, Field
 ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT / "src"))
 
+from anime_pipeline import __version__  # noqa: E402
 from anime_pipeline.config import load_config  # noqa: E402
 from anime_pipeline.studio import (  # noqa: E402
     ProjectStudio,
@@ -30,7 +31,7 @@ CONFIG = load_config(PROJECT, ROOT / "schemas", None)
 STUDIO = ProjectStudio(ROOT, CONFIG, ROOT / "schemas")
 JOBS = StudioJobManager()
 
-app = FastAPI(title="Anime Pipeline Studio", version="0.6.0", docs_url="/api/docs")
+app = FastAPI(title="Anime Pipeline Studio", version=__version__, docs_url="/api/docs")
 app.mount("/static", StaticFiles(directory=ROOT / "studio_static"), name="static")
 
 

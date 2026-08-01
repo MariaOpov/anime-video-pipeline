@@ -7,12 +7,13 @@ It does not overwrite the original mannequin or imported character asset.
 
 ```text
 shot_list.json + dialogue_timeline.json + lip_sync/*.json
+                 + current motion_intent_plan.json
                             |
                             v
                   phase3_manifest.json
                             |
                             v
-          cameras + timeline markers + WAV strips + mouth keys
+       cameras + markers + WAV strips + mouth keys + pose keys
                             |
                             v
                  phase3_assembled.blend
@@ -44,7 +45,8 @@ falls back to the older `file_format = FFMPEG` API when necessary.
 - One camera and one timeline marker are created for every shot.
 - Every dialogue WAV becomes a Blender sound strip at its absolute start frame.
 - Rhubarb cues animate `A`, `I`, `U`, `E`, `O`, `closed`, and `neutral` keys.
-- The existing idle animation continues across the complete scene timeline.
+- A current validated motion-intent plan becomes bounded head, spine, arm, and
+  leg pose keys; without one, assembly retains the Phase 3-only behavior.
 - A small fallback mouth mesh is created for each demo mannequin.
 
 The fallback is intentionally simple. Real PMX/MMD characters should map the
@@ -58,4 +60,5 @@ Phase 3 is complete when:
 2. The timeline contains four camera markers and four dialogue sound strips.
 3. Both mannequin mouths animate during their own dialogue.
 4. `phase3_preview.mp4` contains picture and synchronized speech.
-5. `phase3_scene_report.json` reports 4 cameras, 4 audio strips, and 62 cues.
+5. `phase3_scene_report.json` reports 4 cameras, 4 audio strips, 62 mouth cues,
+   4 performance clips, 8 gestures, positive pose keys, and 0 skipped aliases.

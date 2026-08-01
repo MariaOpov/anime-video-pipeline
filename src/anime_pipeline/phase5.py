@@ -27,6 +27,8 @@ class Phase5Auditor:
         self.metrics: dict[str, Any] = {
             "scene_count": 0, "shot_count": 0, "unresolved_motion_count": 0,
             "dialogue_count": 0, "mouth_cue_count": 0, "timing_warning_count": 0,
+            "performance_clip_count": 0, "gesture_count": 0,
+            "pose_keyframe_count": 0, "skipped_bone_alias_count": 0,
             "duration_seconds": 0, "output_size_bytes": 0, "output_width": 0,
             "output_height": 0, "estimated_cost": 0,
         }
@@ -159,12 +161,28 @@ class Phase5Auditor:
             and int(scene_report.get("camera_count", -1)) == int(summary["shot_count"])
             and int(scene_report.get("audio_strip_count", -1)) == int(summary["dialogue_count"])
             and int(scene_report.get("mouth_cue_count", -1)) == int(summary["mouth_cue_count"])
+            and int(scene_report.get("performance_clip_count", -1)) == int(summary["performance_clip_count"])
+            and int(scene_report.get("gesture_count", -1)) == int(summary["gesture_count"])
         )
         self._gate(3, "blender_assembly_counts_match", counts_match, summary, {
             "shot_count": scene_report.get("camera_count"),
             "dialogue_count": scene_report.get("audio_strip_count"),
             "mouth_cue_count": scene_report.get("mouth_cue_count"),
+            "performance_clip_count": scene_report.get("performance_clip_count"),
+            "gesture_count": scene_report.get("gesture_count"),
         })
+        expected_clips = int(summary["performance_clip_count"])
+        pose_keyframes = int(scene_report.get("pose_keyframe_count", 0))
+        skipped_bones = int(scene_report.get("skipped_bone_alias_count", 0))
+        performance_ok = expected_clips == 0 or (
+            int(scene_report.get("performance_clip_count", -1)) == expected_clips
+            and pose_keyframes > 0 and skipped_bones == 0
+        )
+        self._gate(3, "procedural_gestures_applied", performance_ok,
+                   "all performance clips keyed with 0 skipped bone aliases", {
+                       "performance_clips": scene_report.get("performance_clip_count"),
+                       "pose_keyframes": pose_keyframes, "skipped_bone_aliases": skipped_bones,
+                   })
         scene_path = self._resolve_project_relative(scene_report.get("scene_file", ""))
         preview_path = self._resolve_project_relative(scene_report.get("preview_video", ""))
         artifacts_exist = scene_path.is_file() and preview_path.is_file() and preview_path.stat().st_size > 0
@@ -177,6 +195,12 @@ class Phase5Auditor:
         if timeline:
             self._gate(3, "timeline_dialogue_count_matches", len(timeline["lines"]) == summary["dialogue_count"],
                        len(timeline["lines"]), summary["dialogue_count"])
+        self.metrics.update({
+            "performance_clip_count": expected_clips,
+            "gesture_count": int(summary["gesture_count"]),
+            "pose_keyframe_count": pose_keyframes,
+            "skipped_bone_alias_count": skipped_bones,
+        })
         return manifest
 
     def _audit_phase4(self, timeline: dict[str, Any] | None,

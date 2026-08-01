@@ -33,7 +33,7 @@
                   "maxItems": 4,
                   "uniqueItems": true,
                   "items": {
-                    "enum": ["look_down", "look_up", "head_tilt", "nod", "shake_head", "small_hand_motion", "open_hand", "point", "step_forward", "step_back", "turn_left", "turn_right", "breathe"]
+                    "enum": ["look_down", "look_up", "head_tilt", "nod", "shake_head", "small_hand_motion", "open_hand", "point", "step_forward", "step_back", "turn_left", "turn_right", "breathe", "wind_sway"]
                   }
                 },
                 "look_at": {"type": ["string", "null"]},

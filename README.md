@@ -1,4 +1,4 @@
-# Anime Video Pipeline — Phase 6
+# Anime Video Pipeline — Phase 6.1
 
 A Windows-first foundation for an offline, reusable anime production pipeline.
 Phase 1 turns a text script into validated screenplay and shot-list JSON, indexes
@@ -10,8 +10,9 @@ and animated mouth shape keys. Phase 4 generates subtitles, normalizes audio,
 and exports a verified delivery MP4 through a local FFmpeg runtime. Phase 5
 orchestrates the entire production with one command and refuses release unless
 every configured quality gate passes. Phase 6 adds a local web Studio and
-schema-constrained Ollama motion planning, while preserving the deterministic
-asset resolver as the final authority.
+schema-constrained Ollama motion planning. Phase 6.1 turns the validated
+semantic gestures into bounded Blender pose keyframes while preserving the
+deterministic asset resolver and fixed bone aliases as the final authority.
 
 ## Architecture
 
@@ -47,7 +48,7 @@ Dialogue timeline ---------> Rhubarb phonetic recognizer
 screenplay.json + dialogue_timeline.json + lip_sync/*.json
           |
           v
-Phase 3 manifest ----------> Blender cameras + WAV strips + mouth keys
+Phase 3 manifest ----------> Blender cameras + WAV strips + mouth/pose keys
           |
           v
 Phase 3 preview -----------> SRT + loudness normalization + final MP4
@@ -126,7 +127,7 @@ Launch the local production Studio:
 
 The Studio opens on `http://127.0.0.1:8000` and provides a script editor,
 schema-validated motion JSON editor, Ollama/rules generation, allowlisted
-pipeline controls, incremental logs, final-video playback, and all 27 release
+pipeline controls, incremental logs, final-video playback, and all release
 gates. It is loopback-only and does not expose remote command execution.
 
 Optional local LLM:
@@ -163,7 +164,8 @@ never modified. For Vietnamese and other non-English dialogue, use Rhubarb's
 ## Phase 3 outputs
 
 - `generated/phase3_manifest.json`: validated Blender assembly contract.
-- `blender_scenes/phase3_assembled.blend`: cameras, sound strips, and mouth keys.
+- `blender_scenes/phase3_assembled.blend`: cameras, sound strips, mouth keys,
+  and procedural body-pose keyframes.
 - `generated/phase3_scene_report.json`: machine-readable assembly result.
 - `renders/phase3_preview.mp4`: optional Blender preview with dialogue audio.
 
@@ -197,7 +199,22 @@ duration, dimensions, and file size. See `PHASE5.md` for the full release gate.
 The motion-intent plan is signed with the screenplay SHA-256 and must preserve
 every scene, shot, and character identity. It contains no executable code or
 asset paths. The existing motion selector resolves its action tags to trusted
-local motion assets. See `PHASE6.md` for the workflow and API.
+local motion assets. Phase 6.1 maps only approved gesture names to bounded
+rotations on fixed bone aliases; AI still cannot provide bone names or raw
+keyframes. See `PHASE6.md` and `PHASE6_1.md` for the workflow and API.
+
+## Phase 6.1 procedural gestures
+
+After saving a current motion-intent plan, rerun Phase 1 and production. Phase 3
+then emits one performance clip per character/shot and replaces the demo's
+generic arm loop with deterministic `breathe`, `look_down`, `head_tilt`, `nod`,
+`wind_sway`, look-target, and restrained talking motion. Phase 5 verifies that
+every clip produced pose keys and that no required bone alias was skipped.
+
+The demo rules produce eight gestures across four shots: wind/body sway in the
+opening, Ren looking down while apologizing, Aiko tilting her head for the
+question, and Ren nodding in the final affirmation. `wind_sway` moves the body;
+cloth and hair physics remain model-specific future work.
 
 ## Asset metadata
 
@@ -223,4 +240,4 @@ production outputs. Use `--verbose` for console debug messages.
 
 1. Optional ComfyUI backgrounds and image-to-video inserts.
 2. Import and retarget a production MMD character/motion library.
-3. Improved emotional body, eye, and camera animation.
+3. Eye animation, richer emotional posing, and model-specific cloth/hair wind.

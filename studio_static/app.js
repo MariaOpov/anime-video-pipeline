@@ -28,6 +28,8 @@ const elements = {
   metricGatesDetail: document.querySelector("#metric-gates-detail"),
   metricShots: document.querySelector("#metric-shots"),
   metricCues: document.querySelector("#metric-cues"),
+  metricGestures: document.querySelector("#metric-gestures"),
+  metricGesturesDetail: document.querySelector("#metric-gestures-detail"),
   metricCost: document.querySelector("#metric-cost"),
   toast: document.querySelector("#toast"),
 };
@@ -99,6 +101,8 @@ function renderReport(report) {
     elements.metricGatesDetail.textContent = "Chưa có báo cáo";
     elements.metricShots.textContent = "—";
     elements.metricCues.textContent = "—";
+    elements.metricGestures.textContent = "—";
+    elements.metricGesturesDetail.textContent = "Procedural performance";
     setChip(elements.qualityChip, "No report", "muted");
     elements.qualityList.replaceChildren();
     const empty = document.createElement("p");
@@ -111,6 +115,8 @@ function renderReport(report) {
   elements.metricGatesDetail.textContent = summary.failed_gate_count ? `${summary.failed_gate_count} failed` : "All systems passed";
   elements.metricShots.textContent = summary.shot_count;
   elements.metricCues.textContent = summary.mouth_cue_count;
+  elements.metricGestures.textContent = summary.gesture_count ?? 0;
+  elements.metricGesturesDetail.textContent = `${summary.pose_keyframe_count ?? 0} pose keys`;
   elements.metricCost.textContent = `$${summary.estimated_cost}`;
   setChip(elements.qualityChip, report.status.toUpperCase(), report.status === "complete" ? "ok" : "danger");
   elements.qualityList.replaceChildren();

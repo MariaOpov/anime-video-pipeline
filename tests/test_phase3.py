@@ -7,6 +7,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from anime_pipeline.config import ProjectConfig
 from anime_pipeline.io_utils import atomic_write_json
+from anime_pipeline.motion_ai import RuleMotionPlanner
 from anime_pipeline.phase3 import Phase3Planner, seconds_to_frame
 
 
@@ -24,10 +25,22 @@ class Phase3Tests(unittest.TestCase):
             self._write_fixture(project)
             manifest = Phase3Planner(self._config(project), self.schemas).build()
             self.assertEqual(manifest["frame_end"], 48)
+            self.assertEqual(manifest["version"], 2)
             self.assertEqual(manifest["summary"], {
                 "shot_count": 1, "dialogue_count": 1, "mouth_cue_count": 2,
+                "performance_clip_count": 0, "gesture_count": 0,
             })
             self.assertEqual(manifest["dialogue"][0]["mouth_cues"][1]["mouth_shape"], "A")
+
+    def test_carries_validated_motion_intent_into_performance_clips(self):
+        with tempfile.TemporaryDirectory() as directory:
+            project = Path(directory)
+            self._write_fixture(project, with_intent=True)
+            manifest = Phase3Planner(self._config(project), self.schemas).build()
+            self.assertEqual(manifest["performance"]["source"], "rules")
+            self.assertEqual(manifest["summary"]["performance_clip_count"], 1)
+            self.assertEqual(manifest["performance"]["clips"][0]["character"], "Aiko")
+            self.assertIn("breathe", manifest["performance"]["clips"][0]["gestures"])
 
     def test_rejects_lip_sync_identity_mismatch(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -47,7 +60,8 @@ class Phase3Tests(unittest.TestCase):
             },
         })
 
-    def _write_fixture(self, project: Path, lip_character: str = "Aiko") -> None:
+    def _write_fixture(self, project: Path, lip_character: str = "Aiko",
+                       with_intent: bool = False) -> None:
         (project / "generated").mkdir(parents=True)
         (project / "blender_scenes").mkdir()
         (project / "blender_scenes" / "base.blend").touch()
@@ -80,6 +94,32 @@ class Phase3Tests(unittest.TestCase):
                 {"start": 0.2, "end": 0.8, "source_shape": "D", "mouth_shape": "A"},
             ],
         })
+        if with_intent:
+            screenplay = {
+                "title": "Phase 3 Test", "fps": 24,
+                "scenes": [{
+                    "scene_id": "scene_001", "location": "roof",
+                    "time_of_day": "sunset", "mood": "neutral",
+                    "shots": [{
+                        "shot_id": "shot_001", "duration_seconds": 2.0,
+                        "camera": {"shot_type": "medium", "movement": "static", "target": "Aiko"},
+                        "characters": [{"name": "Aiko", "position": [0, 0, 0],
+                                        "action": "idle_talking", "emotion": "neutral",
+                                        "look_at": None}],
+                        "dialogue": [{"character": "Aiko", "text": "Xin chào",
+                                      "emotion": "neutral"}],
+                        "description": "A gentle wind",
+                    }],
+                }],
+            }
+            intent = RuleMotionPlanner().build("Phase 3 Test", screenplay)
+            atomic_write_json(project / "generated" / "screenplay.json", screenplay)
+            atomic_write_json(project / "generated" / "motion_intent_plan.json", intent)
+            atomic_write_json(project / "generated" / "motion_plan.json", {
+                "intent_source": "rules",
+                "intent_plan": "generated/motion_intent_plan.json",
+                "shots": [],
+            })
 
 
 if __name__ == "__main__":

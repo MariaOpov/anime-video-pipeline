@@ -120,6 +120,21 @@ class MotionAITests(unittest.TestCase):
         self.assertEqual(len(warnings), 1)
         self.assertIn("dramatic_spin", warnings[0])
 
+    def test_rules_add_dialogue_and_environment_gestures(self):
+        screenplay = copy.deepcopy(self.screenplay)
+        shot = screenplay["scenes"][0]["shots"][0]
+        shot["characters"][0]["emotion"] = "neutral"
+        shot["characters"][0]["action"] = "idle_talking"
+        shot["dialogue"][0]["text"] = "Thật chứ?"
+        shot["description"] = "A gentle wind crosses the rooftop"
+        gestures = RuleMotionPlanner().build("Demo", screenplay)["shots"][0]["characters"][0]["gestures"]
+        self.assertEqual(gestures, ["breathe", "head_tilt", "wind_sway"])
+
+        shot["dialogue"][0]["text"] = "Thật. Chúng ta về nhà thôi."
+        shot["description"] = "Dialogue"
+        gestures = RuleMotionPlanner().build("Demo", screenplay)["shots"][0]["characters"][0]["gestures"]
+        self.assertEqual(gestures, ["breathe", "nod"])
+
     def test_job_commands_are_allowlisted(self):
         command = build_job_command(self.root, self.root / "projects" / "demo",
                                     "all", "preview", False, r"D:\Blender\blender.exe")
