@@ -27,6 +27,8 @@
     deterministic pose synthesis, and Blender keyframe insertion.
 11. **Performance Director (Phase 6.2)** — dialogue beat timing, speaker/listener
     roles, gaze targets, deterministic blinks, emotional posture, and conflict audit.
+12. **Cinematic Blocking Director (Phase 6.3)** — stable stage positions, body
+    facing, shot composition, bounded camera motion, and blocking risk audit.
 
 ## Project directory contract
 
@@ -101,6 +103,12 @@ randomness. The manifest carries events, while Blender chooses only fixed
 application-owned targets: common blink morph aliases, an optional eye bone, or
 the demo eye-mesh fallback.
 
+Phase 6.3 derives spatial staging only from validated shot, gaze, and performance
+contracts. System Python chooses application-owned positions, lenses, and camera
+templates, then audits framing, clearance, screen order, and placement overlap.
+Blender inserts only those validated transforms and reports the actual placement
+and camera key counts. No AI-produced coordinate reaches the scene.
+
 ## Failure boundaries
 
 - Invalid configuration stops before any production output is written.
@@ -119,6 +127,8 @@ the demo eye-mesh fallback.
   and unresolved bone aliases fail the final production gate.
 - Overlapping character clips, missing gaze keys, or missing blink keys fail the
   Performance Director release gate.
+- Missing placement/camera keys or any blocking, continuity, framing, or camera
+  clearance risk fails the Cinematic Blocking release gate.
 
 ## Security and licensing
 

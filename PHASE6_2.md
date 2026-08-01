@@ -1,7 +1,7 @@
 # Phase 6.2 — Performance Director
 
 Phase 6.2 turns continuous shot-wide motion into directed acting. It consumes
-only validated Phase 1, Phase 2, and Phase 6 contracts and produces a version 3
+only validated Phase 1, Phase 2, and Phase 6 contracts and produces a directed
 Phase 3 manifest. No LLM generates timing, target names, or Blender keyframes.
 
 ## Directed performance layers
@@ -64,3 +64,6 @@ Inspect `generated/phase3_scene_report.json` and confirm:
 The production report must pass `performance_direction_applied` and all 29
 quality gates. A rig without a supported gaze or blink target fails visibly
 instead of silently shipping a degraded animation.
+
+Phase 6.3 consumes this directed performance contract without changing its
+timing or trust boundary. See `PHASE6_3.md` for spatial staging and camera work.

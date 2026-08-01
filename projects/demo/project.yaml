@@ -88,6 +88,14 @@ phase6:
   procedural_gestures:
     enabled: true
     amplitude_scale: 1.0
+  cinematic_blocking:
+    enabled: true
+    character_spacing: 2.2
+    body_turn_degrees: 10.0
+    camera_motion_enabled: true
+    camera_motion_strength: 0.18
+    safe_frame_fraction: 0.86
+    minimum_camera_clearance: 1.5
   ollama:
     endpoint: http://127.0.0.1:11434
     model: qwen2.5:3b

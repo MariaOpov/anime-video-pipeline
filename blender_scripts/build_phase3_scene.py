@@ -347,7 +347,48 @@ def target_point(character: str | None) -> Vector:
     return armature.matrix_world @ Vector((0, 0, 1.65))
 
 
-def create_camera(shot: dict, settings: dict):
+def _camera_rotation(location: Vector, target: Vector):
+    return (target - location).to_track_quat("-Z", "Y").to_euler()
+
+
+def create_camera(shot: dict, settings: dict, blocking: dict | None = None):
+    if blocking:
+        camera_plan = blocking["camera"]
+        data = bpy.data.cameras.new(f"PIPE_{shot['shot_id']}_Data")
+        data.lens = float(camera_plan["lens_mm"])
+        camera = bpy.data.objects.new(f"PIPE_{shot['shot_id']}_Camera", data)
+        camera_collection().objects.link(camera)
+        start_location = Vector(camera_plan["start_location"])
+        end_location = Vector(camera_plan["end_location"])
+        start_target = Vector(camera_plan["start_target"])
+        end_target = Vector(camera_plan["end_target"])
+        camera.location = start_location
+        camera.rotation_euler = _camera_rotation(start_location, start_target)
+        inserted = 0
+        movement = camera_plan["movement"]
+        if movement != "static":
+            for frame, location, target in (
+                (int(shot["start_frame"]), start_location, start_target),
+                (int(shot["end_frame"]), end_location, end_target),
+            ):
+                camera.location = location
+                camera.rotation_euler = _camera_rotation(location, target)
+                camera.keyframe_insert(data_path="location", frame=frame,
+                                       group="PIPE_CameraMove")
+                camera.keyframe_insert(data_path="rotation_euler", frame=frame,
+                                       group="PIPE_CameraMove")
+                inserted += 2
+            if camera.animation_data and camera.animation_data.action:
+                for curve in camera.animation_data.action.fcurves:
+                    for point in curve.keyframe_points:
+                        point.interpolation = "BEZIER"
+                        point.handle_left_type = "AUTO_CLAMPED"
+                        point.handle_right_type = "AUTO_CLAMPED"
+        camera["pipeline_shot_id"] = shot["shot_id"]
+        camera["pipeline_composition"] = blocking["composition"]
+        camera["pipeline_camera_movement"] = movement
+        return camera, int(movement != "static"), inserted
+
     target = target_point(shot.get("target"))
     shot_type = shot.get("shot_type", "medium")
     presets = {
@@ -367,25 +408,73 @@ def create_camera(shot: dict, settings: dict):
     camera = bpy.data.objects.new(f"PIPE_{shot['shot_id']}_Camera", data)
     camera_collection().objects.link(camera)
     camera.location = location
-    camera.rotation_euler = (target - camera.location).to_track_quat("-Z", "Y").to_euler()
+    camera.rotation_euler = _camera_rotation(camera.location, target)
     camera["pipeline_shot_id"] = shot["shot_id"]
-    return camera
+    return camera, 0, 0
 
 
-def assemble_cameras(manifest: dict) -> int:
+def assemble_cameras(manifest: dict) -> tuple[int, int, int]:
     scene = bpy.context.scene
     for marker in list(scene.timeline_markers):
         if marker.name.startswith("PIPE_"):
             scene.timeline_markers.remove(marker)
     first = None
+    camera_movements = 0
+    camera_keyframes = 0
+    blocking = {
+        shot["shot_id"]: shot
+        for shot in manifest.get("blocking", {}).get("shots", [])
+    }
     for shot in manifest["shots"]:
-        camera = create_camera(shot, manifest.get("camera", {}))
+        camera, moved, inserted = create_camera(
+            shot, manifest.get("camera", {}), blocking.get(shot["shot_id"])
+        )
+        camera_movements += moved
+        camera_keyframes += inserted
         marker = scene.timeline_markers.new(f"PIPE_{shot['shot_id']}", frame=shot["start_frame"])
         marker.camera = camera
         first = first or camera
     if first:
         scene.camera = first
-    return len(manifest["shots"])
+    return len(manifest["shots"]), camera_movements, camera_keyframes
+
+
+def animate_blocking(manifest: dict) -> tuple[int, int, int]:
+    blocking = manifest.get("blocking", {})
+    shots = blocking.get("shots", []) if blocking.get("enabled", False) else []
+    placements = 0
+    body_facings = 0
+    inserted = 0
+    touched = set()
+    for shot in shots:
+        start, end = int(shot["start_frame"]), int(shot["end_frame"])
+        for placement in shot["placements"]:
+            armature = armature_for(placement["character"])
+            armature.rotation_mode = "XYZ"
+            location = Vector(placement["position"])
+            yaw = math.radians(float(placement["body_yaw_degrees"]))
+            for frame in (start, end):
+                armature.location = location
+                armature.rotation_euler.z = yaw
+                armature.keyframe_insert(data_path="location", frame=frame,
+                                         group="PIPE_Blocking")
+                armature.keyframe_insert(data_path="rotation_euler", index=2, frame=frame,
+                                         group="PIPE_Blocking")
+                inserted += 2
+            placements += 1
+            body_facings += placement.get("facing_target") is not None
+            touched.add(armature.name)
+    for name in touched:
+        armature = bpy.data.objects.get(name)
+        action = armature.animation_data.action if armature and armature.animation_data else None
+        if not action:
+            continue
+        for curve in action.fcurves:
+            if curve.data_path not in {"location", "rotation_euler"}:
+                continue
+            for point in curve.keyframe_points:
+                point.interpolation = "CONSTANT"
+    return placements, body_facings, inserted
 
 
 def add_sound_strip(editor, *, name: str, filepath: str, channel: int, frame_start: int):
@@ -450,7 +539,12 @@ def write_report(project: Path, manifest: dict, *, camera_count: int, audio_coun
                  skipped_bones: int, dialogue_beats: int, gaze_targets: int,
                  gaze_keyframes: int, blink_targets: int, blink_events: int,
                  blink_keyframes: int, listener_reactions: int,
-                 performance_conflicts: int, rendered: bool) -> Path:
+                 performance_conflicts: int, blocking_shots: int,
+                 character_placements: int, body_facings: int,
+                 placement_keyframes: int, camera_movements: int,
+                 camera_keyframes: int, framing_risks: int,
+                 camera_collision_risks: int, continuity_violations: int,
+                 blocking_conflicts: int, rendered: bool) -> Path:
     output_scene = (project / manifest["output_scene"]).resolve()
     preview = (project / manifest["preview_video"]).resolve()
     report = {
@@ -468,6 +562,16 @@ def write_report(project: Path, manifest: dict, *, camera_count: int, audio_coun
         "blink_keyframe_count": blink_keyframes,
         "listener_reaction_count": listener_reactions,
         "performance_conflict_count": performance_conflicts,
+        "blocking_shot_count": blocking_shots,
+        "character_placement_count": character_placements,
+        "body_facing_count": body_facings,
+        "placement_keyframe_count": placement_keyframes,
+        "camera_motion_count": camera_movements,
+        "camera_keyframe_count": camera_keyframes,
+        "framing_risk_count": framing_risks,
+        "camera_collision_risk_count": camera_collision_risks,
+        "continuity_violation_count": continuity_violations,
+        "blocking_conflict_count": blocking_conflicts,
         "scene_file": output_scene.relative_to(project).as_posix(),
         "preview_video": preview.relative_to(project).as_posix() if rendered else None,
     }
@@ -484,15 +588,17 @@ def main() -> None:
     project = args.project.resolve()
     manifest = load_json(project / "generated" / "phase3_manifest.json")
     preview = configure_scene(project, manifest)
-    camera_count = assemble_cameras(manifest)
+    camera_count, camera_movements, camera_keyframes = assemble_cameras(manifest)
     audio_count = assemble_audio(project, manifest)
     performance_targets, performance_clips, gestures, pose_keyframes, skipped_bones = (
         animate_performances(manifest)
     )
+    character_placements, body_facings, placement_keyframes = animate_blocking(manifest)
     gaze_targets, gaze_keyframes = animate_gaze(manifest)
     blink_targets, blink_events, blink_keyframes = animate_blinks(manifest)
     mouth_targets, mouth_cues = animate_dialogue(manifest)
     direction = manifest.get("performance", {})
+    blocking = manifest.get("blocking", {})
 
     output_scene = (project / manifest["output_scene"]).resolve()
     output_scene.parent.mkdir(parents=True, exist_ok=True)
@@ -511,6 +617,14 @@ def main() -> None:
         blink_keyframes=blink_keyframes,
         listener_reactions=int(direction.get("listener_reaction_count", 0)),
         performance_conflicts=int(direction.get("performance_conflict_count", 0)),
+        blocking_shots=len(blocking.get("shots", [])),
+        character_placements=character_placements, body_facings=body_facings,
+        placement_keyframes=placement_keyframes,
+        camera_movements=camera_movements, camera_keyframes=camera_keyframes,
+        framing_risks=int(blocking.get("framing_risk_count", 0)),
+        camera_collision_risks=int(blocking.get("camera_collision_risk_count", 0)),
+        continuity_violations=int(blocking.get("continuity_violation_count", 0)),
+        blocking_conflicts=int(blocking.get("blocking_conflict_count", 0)),
     )
     print(
         f"PHASE 3 BLENDER COMPLETE: {camera_count} cameras, {audio_count} audio strips, "
@@ -520,6 +634,10 @@ def main() -> None:
         f"{gaze_targets} gaze targets/{gaze_keyframes} gaze keys, "
         f"{blink_events} blinks/{blink_keyframes} blink keys, "
         f"{direction.get('listener_reaction_count', 0)} listener reactions, "
+        f"{len(blocking.get('shots', []))} blocking shots/{character_placements} placements, "
+        f"{camera_movements} camera moves/{camera_keyframes} camera keys, "
+        f"{blocking.get('framing_risk_count', 0)} framing risks, "
+        f"{blocking.get('camera_collision_risk_count', 0)} camera collision risks, "
         f"{skipped_bones} skipped aliases, scene={output_scene}, "
         f"preview={preview if args.render else 'not rendered'}, report={report}"
     )

@@ -1,9 +1,9 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "type": "object",
-  "required": ["version", "project_name", "fps", "frame_start", "frame_end", "base_scene", "output_scene", "preview_video", "render", "camera", "performance", "shots", "dialogue", "summary"],
+  "required": ["version", "project_name", "fps", "frame_start", "frame_end", "base_scene", "output_scene", "preview_video", "render", "camera", "performance", "blocking", "shots", "dialogue", "summary"],
   "properties": {
-    "version": {"const": 3},
+    "version": {"const": 4},
     "project_name": {"type": "string", "minLength": 1},
     "fps": {"type": "integer", "minimum": 1},
     "frame_start": {"type": "integer", "minimum": 1},
@@ -99,6 +99,72 @@
       },
       "additionalProperties": false
     },
+    "blocking": {
+      "type": "object",
+      "required": ["enabled", "shots", "placement_count", "body_facing_count", "camera_motion_count", "framing_risk_count", "camera_collision_risk_count", "continuity_violation_count", "blocking_conflict_count"],
+      "properties": {
+        "enabled": {"type": "boolean"},
+        "shots": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["scene_id", "shot_id", "start_frame", "end_frame", "composition", "subject", "listener", "placements", "camera", "framing_risk_count", "camera_collision_risk_count", "continuity_violation_count", "blocking_conflict_count"],
+            "properties": {
+              "scene_id": {"type": "string", "minLength": 1},
+              "shot_id": {"type": "string", "minLength": 1},
+              "start_frame": {"type": "integer", "minimum": 1},
+              "end_frame": {"type": "integer", "minimum": 1},
+              "composition": {"enum": ["single", "close_up", "over_shoulder", "two_shot"]},
+              "subject": {"type": "string", "minLength": 1},
+              "listener": {"type": ["string", "null"]},
+              "placements": {
+                "type": "array", "minItems": 1,
+                "items": {
+                  "type": "object",
+                  "required": ["character", "position", "facing_target", "body_yaw_degrees"],
+                  "properties": {
+                    "character": {"type": "string", "minLength": 1},
+                    "position": {
+                      "type": "array", "minItems": 3, "maxItems": 3,
+                      "items": {"type": "number", "minimum": -20, "maximum": 20}
+                    },
+                    "facing_target": {"type": ["string", "null"]},
+                    "body_yaw_degrees": {"type": "number", "minimum": -35, "maximum": 35}
+                  },
+                  "additionalProperties": false
+                }
+              },
+              "camera": {
+                "type": "object",
+                "required": ["movement", "lens_mm", "start_location", "end_location", "start_target", "end_target"],
+                "properties": {
+                  "movement": {"enum": ["static", "slow_dolly_in", "slow_dolly_out", "lateral_drift"]},
+                  "lens_mm": {"type": "number", "minimum": 18, "maximum": 200},
+                  "start_location": {"$ref": "#/$defs/vector3"},
+                  "end_location": {"$ref": "#/$defs/vector3"},
+                  "start_target": {"$ref": "#/$defs/vector3"},
+                  "end_target": {"$ref": "#/$defs/vector3"}
+                },
+                "additionalProperties": false
+              },
+              "framing_risk_count": {"type": "integer", "minimum": 0},
+              "camera_collision_risk_count": {"type": "integer", "minimum": 0},
+              "continuity_violation_count": {"type": "integer", "minimum": 0},
+              "blocking_conflict_count": {"type": "integer", "minimum": 0}
+            },
+            "additionalProperties": false
+          }
+        },
+        "placement_count": {"type": "integer", "minimum": 0},
+        "body_facing_count": {"type": "integer", "minimum": 0},
+        "camera_motion_count": {"type": "integer", "minimum": 0},
+        "framing_risk_count": {"type": "integer", "minimum": 0},
+        "camera_collision_risk_count": {"type": "integer", "minimum": 0},
+        "continuity_violation_count": {"type": "integer", "minimum": 0},
+        "blocking_conflict_count": {"type": "integer", "minimum": 0}
+      },
+      "additionalProperties": false
+    },
     "shots": {
       "type": "array", "minItems": 1,
       "items": {
@@ -128,7 +194,7 @@
       }
     },
     "summary": {
-      "type": "object", "required": ["shot_count", "dialogue_count", "mouth_cue_count", "performance_clip_count", "gesture_count", "dialogue_beat_count", "gaze_target_count", "blink_event_count", "listener_reaction_count", "performance_conflict_count"],
+      "type": "object", "required": ["shot_count", "dialogue_count", "mouth_cue_count", "performance_clip_count", "gesture_count", "dialogue_beat_count", "gaze_target_count", "blink_event_count", "listener_reaction_count", "performance_conflict_count", "blocking_shot_count", "character_placement_count", "body_facing_count", "camera_motion_count", "framing_risk_count", "camera_collision_risk_count", "continuity_violation_count", "blocking_conflict_count"],
       "properties": {
         "shot_count": {"type": "integer", "minimum": 1},
         "dialogue_count": {"type": "integer", "minimum": 0},
@@ -139,9 +205,23 @@
         "gaze_target_count": {"type": "integer", "minimum": 0},
         "blink_event_count": {"type": "integer", "minimum": 0},
         "listener_reaction_count": {"type": "integer", "minimum": 0},
-        "performance_conflict_count": {"type": "integer", "minimum": 0}
+        "performance_conflict_count": {"type": "integer", "minimum": 0},
+        "blocking_shot_count": {"type": "integer", "minimum": 0},
+        "character_placement_count": {"type": "integer", "minimum": 0},
+        "body_facing_count": {"type": "integer", "minimum": 0},
+        "camera_motion_count": {"type": "integer", "minimum": 0},
+        "framing_risk_count": {"type": "integer", "minimum": 0},
+        "camera_collision_risk_count": {"type": "integer", "minimum": 0},
+        "continuity_violation_count": {"type": "integer", "minimum": 0},
+        "blocking_conflict_count": {"type": "integer", "minimum": 0}
       }, "additionalProperties": false
     }
   },
-  "additionalProperties": false
+  "additionalProperties": false,
+  "$defs": {
+    "vector3": {
+      "type": "array", "minItems": 3, "maxItems": 3,
+      "items": {"type": "number", "minimum": -1000, "maximum": 1000}
+    }
+  }
 }

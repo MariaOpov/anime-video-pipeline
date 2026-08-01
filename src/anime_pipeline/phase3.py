@@ -6,6 +6,7 @@ import math
 from pathlib import Path
 from typing import Any
 
+from .cinematography import direct_cinematography
 from .config import ProjectConfig
 from .direction import direct_performance
 from .io_utils import atomic_write_json, load_json, validate
@@ -70,6 +71,7 @@ class Phase3Planner:
             })
 
         performance = self._build_performance(shots, timeline)
+        blocking = self._build_blocking(shots, performance)
 
         dialogue = []
         cue_total = 0
@@ -103,7 +105,7 @@ class Phase3Planner:
                             float(timeline.get("total_duration_seconds", 0)))
         output = self.config.data["output"]
         manifest = {
-            "version": 3, "project_name": self.config.data["project_name"],
+            "version": 4, "project_name": self.config.data["project_name"],
             "fps": self.config.fps, "frame_start": 1,
             "frame_end": max(1, math.ceil(total_seconds * self.config.fps)),
             "base_scene": base_scene.relative_to(self.config.project_dir).as_posix(),
@@ -115,6 +117,7 @@ class Phase3Planner:
                 "resolution_percentage": int(self.settings.get("resolution_percentage", 100)),
             },
             "camera": self.settings.get("camera", {}), "performance": performance,
+            "blocking": blocking,
             "shots": shots, "dialogue": dialogue,
             "summary": {"shot_count": len(shots), "dialogue_count": len(dialogue),
                         "mouth_cue_count": cue_total,
@@ -126,7 +129,15 @@ class Phase3Planner:
                         "gaze_target_count": len(performance["gaze_events"]),
                         "blink_event_count": len(performance["blink_events"]),
                         "listener_reaction_count": performance["listener_reaction_count"],
-                        "performance_conflict_count": performance["performance_conflict_count"]},
+                        "performance_conflict_count": performance["performance_conflict_count"],
+                        "blocking_shot_count": len(blocking["shots"]),
+                        "character_placement_count": blocking["placement_count"],
+                        "body_facing_count": blocking["body_facing_count"],
+                        "camera_motion_count": blocking["camera_motion_count"],
+                        "framing_risk_count": blocking["framing_risk_count"],
+                        "camera_collision_risk_count": blocking["camera_collision_risk_count"],
+                        "continuity_violation_count": blocking["continuity_violation_count"],
+                        "blocking_conflict_count": blocking["blocking_conflict_count"]},
         }
         validate(manifest, self.schemas / "phase3_manifest.schema.json", "Phase 3 manifest")
         return manifest
@@ -199,3 +210,13 @@ class Phase3Planner:
         result["source"] = intent["source"]
         result.update(directed)
         return result
+
+    def _build_blocking(self, shots: list[dict[str, Any]],
+                        performance: dict[str, Any]) -> dict[str, Any]:
+        phase6 = self.config.data.get("phase6", {})
+        settings = phase6.get("cinematic_blocking")
+        if settings is None:
+            settings = {"enabled": False}
+        return direct_cinematography(
+            shots, performance, self.settings.get("camera", {}), settings
+        )

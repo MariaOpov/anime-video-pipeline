@@ -29,7 +29,7 @@ class Phase5Tests(unittest.TestCase):
             )
             self.assertEqual(report["status"], "complete")
             self.assertEqual(report["summary"]["failed_gate_count"], 0)
-            self.assertEqual(report["summary"]["quality_gate_count"], 29)
+            self.assertEqual(report["summary"]["quality_gate_count"], 30)
             self.assertEqual(report["summary"]["mouth_cue_count"], 2)
             self.assertTrue(output.is_file())
             self.assertIn("final_video", [item["name"] for item in report["artifacts"]])
@@ -142,6 +142,60 @@ class Phase5Tests(unittest.TestCase):
             self.assertEqual(report["status"], "failed")
             self.assertGreater(report["summary"]["failed_gate_count"], 0)
 
+    def test_cinematic_blocking_requires_placements_camera_keys_and_zero_risks(self):
+        with tempfile.TemporaryDirectory() as directory:
+            project = Path(directory)
+            self._write_fixture(project)
+            manifest_path = project / "generated" / "phase3_manifest.json"
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            manifest["blocking"] = {
+                "enabled": True,
+                "shots": [{
+                    "scene_id": "scene_001", "shot_id": "scene_001_shot_001",
+                    "start_frame": 1, "end_frame": 48, "composition": "single",
+                    "subject": "Aiko", "listener": None,
+                    "placements": [{"character": "Aiko", "position": [0, 0, 0],
+                                    "facing_target": None, "body_yaw_degrees": 0}],
+                    "camera": {"movement": "slow_dolly_in", "lens_mm": 56,
+                               "start_location": [0, -6, 1.7],
+                               "end_location": [0, -5.8, 1.7],
+                               "start_target": [0, 0, 1.6],
+                               "end_target": [0, 0, 1.6]},
+                    "framing_risk_count": 0, "camera_collision_risk_count": 0,
+                    "continuity_violation_count": 0, "blocking_conflict_count": 0,
+                }],
+                "placement_count": 1, "body_facing_count": 0,
+                "camera_motion_count": 1, "framing_risk_count": 0,
+                "camera_collision_risk_count": 0, "continuity_violation_count": 0,
+                "blocking_conflict_count": 0,
+            }
+            manifest["summary"].update({
+                "blocking_shot_count": 1, "character_placement_count": 1,
+                "body_facing_count": 0, "camera_motion_count": 1,
+                "framing_risk_count": 0, "camera_collision_risk_count": 0,
+                "continuity_violation_count": 0, "blocking_conflict_count": 0,
+            })
+            atomic_write_json(manifest_path, manifest)
+            scene_path = project / "generated" / "phase3_scene_report.json"
+            scene = json.loads(scene_path.read_text(encoding="utf-8"))
+            scene.update({"blocking_shot_count": 1, "character_placement_count": 1,
+                          "body_facing_count": 0, "camera_motion_count": 1,
+                          "framing_risk_count": 0, "camera_collision_risk_count": 0,
+                          "continuity_violation_count": 0, "blocking_conflict_count": 0})
+            atomic_write_json(scene_path, scene)
+            with self.assertRaisesRegex(QualityGateError, "cinematic_blocking_applied"):
+                Phase5Auditor(self._config(project), self.schemas).run(
+                    tool_versions=self.tool_versions
+                )
+            scene.update({"placement_keyframe_count": 4, "camera_keyframe_count": 4})
+            atomic_write_json(scene_path, scene)
+            report, _ = Phase5Auditor(self._config(project), self.schemas).run(
+                tool_versions=self.tool_versions
+            )
+            gate = next(item for item in report["quality_gates"]
+                        if item["name"] == "cinematic_blocking_applied")
+            self.assertEqual(gate["status"], "passed")
+
     def test_timing_warnings_obey_configured_limit(self):
         with tempfile.TemporaryDirectory() as directory:
             project = Path(directory)
@@ -233,7 +287,7 @@ class Phase5Tests(unittest.TestCase):
             "duration_seconds": 1.0, "mouth_cues": cues,
         })
         manifest = {
-            "version": 3, "project_name": "Phase 5 Test", "fps": 24, "frame_start": 1, "frame_end": 48,
+            "version": 4, "project_name": "Phase 5 Test", "fps": 24, "frame_start": 1, "frame_end": 48,
             "base_scene": "blender_scenes/base.blend", "output_scene": "blender_scenes/assembled.blend",
             "preview_video": "renders/preview.mp4",
             "render": {"engine": "BLENDER_EEVEE", "width": 1280, "height": 720, "resolution_percentage": 50},
@@ -243,6 +297,10 @@ class Phase5Tests(unittest.TestCase):
                             "gaze_events": [], "blink_events": [],
                             "dialogue_beat_count": 0, "listener_reaction_count": 0,
                             "performance_conflict_count": 0},
+            "blocking": {"enabled": False, "shots": [], "placement_count": 0,
+                         "body_facing_count": 0, "camera_motion_count": 0,
+                         "framing_risk_count": 0, "camera_collision_risk_count": 0,
+                         "continuity_violation_count": 0, "blocking_conflict_count": 0},
             "shots": [{"scene_id": "scene_001", "shot_id": "scene_001_shot_001", "start_frame": 1,
                        "end_frame": 48, "shot_type": "medium", "movement": "static", "target": "Aiko"}],
             "dialogue": [{"line_id": "line_001", "shot_id": "scene_001_shot_001", "character": "Aiko",
@@ -252,7 +310,11 @@ class Phase5Tests(unittest.TestCase):
                         "performance_clip_count": 0, "gesture_count": 0,
                         "dialogue_beat_count": 0, "gaze_target_count": 0,
                         "blink_event_count": 0, "listener_reaction_count": 0,
-                        "performance_conflict_count": 0},
+                        "performance_conflict_count": 0,
+                        "blocking_shot_count": 0, "character_placement_count": 0,
+                        "body_facing_count": 0, "camera_motion_count": 0,
+                        "framing_risk_count": 0, "camera_collision_risk_count": 0,
+                        "continuity_violation_count": 0, "blocking_conflict_count": 0},
         }
         atomic_write_json(project / "generated" / "phase3_manifest.json", manifest)
         (project / "blender_scenes" / "assembled.blend").write_bytes(b"BLENDER" * 32)
@@ -267,6 +329,11 @@ class Phase5Tests(unittest.TestCase):
             "gaze_keyframe_count": 0, "blink_target_count": 0,
             "blink_event_count": 0, "blink_keyframe_count": 0,
             "listener_reaction_count": 0, "performance_conflict_count": 0,
+            "blocking_shot_count": 0, "character_placement_count": 0,
+            "body_facing_count": 0, "placement_keyframe_count": 0,
+            "camera_motion_count": 0, "camera_keyframe_count": 0,
+            "framing_risk_count": 0, "camera_collision_risk_count": 0,
+            "continuity_violation_count": 0, "blocking_conflict_count": 0,
             "preview_video": "renders/preview.mp4",
         })
         (project / "subtitles" / "dialogue.srt").write_text("1\n00:00:00,000 --> 00:00:01,000\nXin chào\n", encoding="utf-8")

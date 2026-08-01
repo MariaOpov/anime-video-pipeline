@@ -13,7 +13,7 @@ shot_list.json + dialogue_timeline.json + lip_sync/*.json
                   phase3_manifest.json
                             |
                             v
-       cameras + markers + WAV strips + mouth keys + pose keys
+       blocking + cameras + markers + WAV + mouth/pose keys
                             |
                             v
                  phase3_assembled.blend
@@ -43,6 +43,9 @@ falls back to the older `file_format = FFMPEG` API when necessary.
 ## Demo behavior
 
 - One camera and one timeline marker are created for every shot.
+- Validated staging sets stable character positions and bounded body facing.
+- Shot composition selects two-shot, close-up, over-shoulder, or single framing;
+  enabled camera moves receive keyed start/end transforms.
 - Every dialogue WAV becomes a Blender sound strip at its absolute start frame.
 - Rhubarb cues animate `A`, `I`, `U`, `E`, `O`, `closed`, and `neutral` keys.
 - A current validated motion-intent plan becomes bounded head, spine, arm, and
@@ -62,4 +65,5 @@ Phase 3 is complete when:
 4. `phase3_preview.mp4` contains picture and synchronized speech.
 5. `phase3_scene_report.json` reports 4 cameras, 4 audio strips, 62 mouth cues,
    8 performance clips, 12 gestures, 4 dialogue beats, 8 gaze targets,
-   deterministic blinks, 4 listener reactions, and 0 conflicts/skipped aliases.
+   deterministic blinks, 4 listener reactions, 4 blocked shots, 8 placements,
+   3 camera moves, and 0 conflicts, risks, or skipped aliases.

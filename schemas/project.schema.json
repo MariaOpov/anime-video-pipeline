@@ -143,6 +143,19 @@
           },
           "additionalProperties": false
         },
+        "cinematic_blocking": {
+          "type": "object",
+          "properties": {
+            "enabled": {"type": "boolean"},
+            "character_spacing": {"type": "number", "minimum": 0.8, "maximum": 6.0},
+            "body_turn_degrees": {"type": "number", "minimum": 0, "maximum": 35},
+            "camera_motion_enabled": {"type": "boolean"},
+            "camera_motion_strength": {"type": "number", "minimum": 0, "maximum": 0.75},
+            "safe_frame_fraction": {"type": "number", "minimum": 0.5, "maximum": 0.98},
+            "minimum_camera_clearance": {"type": "number", "minimum": 0.5, "maximum": 5.0}
+          },
+          "additionalProperties": false
+        },
         "ollama": {
           "type": "object",
           "required": ["endpoint", "model"],
