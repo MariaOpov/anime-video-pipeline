@@ -57,6 +57,23 @@ phase3:
     close_up_distance: 4.2
     medium_distance: 6.4
     wide_distance: 8.6
+phase4:
+  enabled: true
+  input_video: renders/phase3_preview.mp4
+  subtitle_file: subtitles/dialogue_vi.srt
+  output_video: output/final_video.mp4
+  subtitle_mode: auto
+  include_speaker_names: false
+  subtitle_language_code: vie
+  subtitle_style: FontName=Arial,FontSize=22,Outline=2,Shadow=0,MarginV=24,Alignment=2
+  video_codec: libx264
+  video_preset: medium
+  crf: 20
+  audio_codec: aac
+  audio_bitrate: 192k
+  loudness_target_lufs: -16
+  true_peak_db: -1.5
+  loudness_range_lu: 11
 characters:
   Aiko:
     model_id: aiko_demo
