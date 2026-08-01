@@ -82,6 +82,13 @@ phase5:
   max_timing_warnings: 0
   min_output_size_bytes: 1024
   duration_tolerance_seconds: 0.25
+phase6:
+  enabled: true
+  max_script_characters: 100000
+  ollama:
+    endpoint: http://127.0.0.1:11434
+    model: qwen2.5:3b
+    timeout_seconds: 180
 characters:
   Aiko:
     model_id: aiko_demo

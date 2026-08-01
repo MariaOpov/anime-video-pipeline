@@ -36,3 +36,20 @@ demo voice, especially for commercial projects.
 
 `setup_phase4.ps1` installs the wheel inside the ignored `.venv`. Neither the
 wrapper package nor its FFmpeg executable is committed to this repository.
+
+## FastAPI and Uvicorn
+
+- FastAPI license: MIT
+- Uvicorn license: BSD-3-Clause
+- Use: project-local Phase 6 HTTP application and ASGI development server
+
+They are installed inside `.venv` by `setup_phase6.ps1` and are not
+redistributed by this repository.
+
+## Ollama
+
+- Project: Ollama
+- Use: optional local structured-output motion planning
+
+Ollama and model weights are not installed or redistributed by Phase 6. Review
+the license of the selected Ollama model before distributing derived content.

@@ -20,6 +20,8 @@
 7. **Media layer (Phase 4)** — SRT generation, loudness normalization, final MP4 export.
 8. **Operations layer (Phase 5)** — one-command orchestration, logs, QA gates,
    atomic outputs, stage timing, dry-run, and resume.
+9. **Studio layer (Phase 6)** — local FastAPI UI, schema-constrained motion
+   intent, allowlisted jobs, artifact preview, and quality visualization.
 
 ## Project directory contract
 
@@ -40,6 +42,7 @@ project/
 │   ├── asset_index.json
 │   ├── motion_plan.json
 │   ├── pipeline_state.json
+│   ├── motion_intent_plan.json
 │   ├── phase5_run_record.json
 │   └── production_report.json
 ├── dialogue/
@@ -72,6 +75,12 @@ records tool versions and stage durations, and writes a schema-validated
 `production_report.json`. A failed gate creates a failed report and returns a
 non-zero exit code.
 
+Phase 6 sits above the existing pipeline instead of bypassing it. Its local UI
+can edit the script and propose semantic motion intent, but JSON Schema plus
+screenplay identity checks form a trust boundary before the deterministic
+motion selector sees the proposal. Job endpoints choose from fixed commands;
+they never accept a shell command from the browser.
+
 ## Failure boundaries
 
 - Invalid configuration stops before any production output is written.
@@ -82,6 +91,10 @@ non-zero exit code.
 - Resume skips only a completed stage whose recorded output still exists.
 - One-command production stops at the first execution failure; the final audit
   reports all detectable quality failures together.
+- A stale motion-intent digest is ignored during screenplay regeneration; a
+  malformed plan or changed shot/character identity is rejected.
+- Studio binds to loopback only and serves project paths through fixed
+  document/artifact allowlists.
 
 ## Security and licensing
 

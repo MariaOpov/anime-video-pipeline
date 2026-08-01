@@ -11,6 +11,7 @@ from .assets import build_asset_index
 from .config import load_config
 from .io_utils import atomic_write_json, load_json, validate
 from .motions import MotionSelector, create_motion_plan
+from .motion_ai import apply_motion_intent, screenplay_digest, validate_motion_intent
 from .phase2 import Phase2Runner
 from .screenplay import OllamaAnalyzer, RuleBasedAnalyzer
 from .state import PipelineState
@@ -52,8 +53,33 @@ class Pipeline:
             validate(screenplay, self.schemas / "screenplay.schema.json", "screenplay")
             assets, warnings = build_asset_index(config.asset_paths, self.schemas / "asset.schema.json")
             selector = MotionSelector(assets, config.data.get("motion_fallbacks"))
-            motion_plan = create_motion_plan(screenplay, selector, config.data.get("characters", {}))
-            shot_list = self._flatten_shots(screenplay)
+            motion_screenplay = screenplay
+            motion_intent_path = config.generated_dir / "motion_intent_plan.json"
+            motion_intent = None
+            if motion_intent_path.is_file():
+                motion_intent = load_json(motion_intent_path)
+                validate(
+                    motion_intent, self.schemas / "motion_intent.schema.json", "motion intent plan"
+                )
+                if motion_intent["screenplay_sha256"] != screenplay_digest(screenplay):
+                    logger.warning("Ignored stale motion intent plan; regenerate it in Studio")
+                    motion_intent = None
+                else:
+                    validate_motion_intent(
+                        motion_intent, screenplay, self.schemas / "motion_intent.schema.json"
+                    )
+                    motion_screenplay = apply_motion_intent(screenplay, motion_intent)
+                    logger.info("Applied validated %s motion intent plan", motion_intent["source"])
+            motion_plan = create_motion_plan(
+                motion_screenplay, selector, config.data.get("characters", {})
+            )
+            if motion_intent:
+                motion_plan["intent_source"] = motion_intent["source"]
+                motion_plan["intent_plan"] = "generated/motion_intent_plan.json"
+            # Motion intent may also suggest a validated camera framing. Keep the
+            # canonical screenplay unchanged, but carry those suggestions into
+            # the downstream shot list consumed by Blender assembly.
+            shot_list = self._flatten_shots(motion_screenplay)
             for warning in warnings:
                 logger.warning(warning)
             unresolved = sum(
@@ -85,7 +111,13 @@ class Pipeline:
                 "asset_index": {"assets": assets, "warnings": warnings}, "motion_plan": motion_plan,
             }
             for stage, output in outputs.items():
-                if self.resume and state.can_resume(stage):
+                can_resume = self.resume and state.can_resume(stage)
+                if (stage in {"shot_list", "motion_plan"} and can_resume
+                        and motion_intent_path.is_file()
+                        and output.is_file()
+                        and motion_intent_path.stat().st_mtime_ns > output.stat().st_mtime_ns):
+                    can_resume = False
+                if can_resume:
                     logger.info("Resume: skipped %s", stage)
                     continue
                 atomic_write_json(output, payloads[stage])

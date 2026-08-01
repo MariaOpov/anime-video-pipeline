@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["version", "source", "project_name", "fps", "screenplay_sha256", "shots"],
+  "properties": {
+    "version": {"const": 1},
+    "source": {"enum": ["ollama", "rules", "manual"]},
+    "project_name": {"type": "string", "minLength": 1},
+    "fps": {"type": "integer", "minimum": 1, "maximum": 120},
+    "screenplay_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "shots": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["scene_id", "shot_id", "camera_suggestion", "characters", "notes"],
+        "properties": {
+          "scene_id": {"type": "string", "minLength": 1},
+          "shot_id": {"type": "string", "minLength": 1},
+          "camera_suggestion": {"enum": ["close_up", "medium", "wide", "full", "establishing"]},
+          "characters": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["name", "action", "emotion", "intensity", "gestures", "look_at", "confidence"],
+              "properties": {
+                "name": {"type": "string", "minLength": 1},
+                "action": {"type": "string", "pattern": "^[a-z][a-z0-9_]{1,63}$"},
+                "emotion": {"enum": ["neutral", "sad", "angry", "surprised", "happy", "fearful", "determined"]},
+                "intensity": {"type": "number", "minimum": 0, "maximum": 1},
+                "gestures": {
+                  "type": "array",
+                  "maxItems": 4,
+                  "uniqueItems": true,
+                  "items": {
+                    "enum": ["look_down", "look_up", "head_tilt", "nod", "shake_head", "small_hand_motion", "open_hand", "point", "step_forward", "step_back", "turn_left", "turn_right", "breathe"]
+                  }
+                },
+                "look_at": {"type": ["string", "null"]},
+                "confidence": {"type": "number", "minimum": 0, "maximum": 1}
+              },
+              "additionalProperties": false
+            }
+          },
+          "notes": {"type": "string", "maxLength": 240}
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}
