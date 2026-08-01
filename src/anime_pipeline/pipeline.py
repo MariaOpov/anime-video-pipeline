@@ -11,6 +11,7 @@ from .assets import build_asset_index
 from .config import load_config
 from .io_utils import atomic_write_json, load_json, validate
 from .motions import MotionSelector, create_motion_plan
+from .phase2 import Phase2Runner
 from .screenplay import OllamaAnalyzer, RuleBasedAnalyzer
 from .state import PipelineState
 
@@ -26,12 +27,13 @@ class PipelineResult:
 
 class Pipeline:
     def __init__(self, project_dir: Path, preset_override: str | None, dry_run: bool,
-                 resume: bool, verbose: bool):
+                 resume: bool, verbose: bool, phase: int = 1):
         self.project_dir = project_dir
         self.preset_override = preset_override
         self.dry_run = dry_run
         self.resume = resume
         self.verbose = verbose
+        self.phase = phase
         self.root = Path(__file__).resolve().parents[2]
         self.schemas = self.root / "schemas"
 
@@ -59,6 +61,13 @@ class Pipeline:
                 for shot in motion_plan["shots"] for assignment in shot["assignments"]
             )
             if self.dry_run:
+                if self.phase == 2:
+                    phase2 = Phase2Runner(config, self.schemas, logger, dry_run=True, resume=self.resume)
+                    phase2_summary = phase2.run(screenplay, shot_list)
+                    return PipelineResult(
+                        f"DRY RUN PHASE 2 OK — {len(screenplay['scenes'])} scene(s), "
+                        f"{len(shot_list['shots'])} shot(s), {phase2_summary}"
+                    )
                 return PipelineResult(
                     f"DRY RUN OK — {len(screenplay['scenes'])} scene(s), {len(shot_list['shots'])} shot(s), "
                     f"{len(assets)} asset(s), {unresolved} unresolved motion assignment(s), {len(warnings)} warning(s)."
@@ -81,12 +90,19 @@ class Pipeline:
                     continue
                 atomic_write_json(output, payloads[stage])
                 state.complete(stage, [output])
+            if self.phase == 2:
+                phase2 = Phase2Runner(config, self.schemas, logger, dry_run=False, resume=self.resume)
+                phase2_summary = phase2.run(screenplay, shot_list)
+                return PipelineResult(
+                    f"PHASE 2 COMPLETE — {len(screenplay['scenes'])} scene(s), "
+                    f"{len(shot_list['shots'])} shot(s), {phase2_summary} Outputs: {config.project_dir}"
+                )
             return PipelineResult(
                 f"PHASE 1 COMPLETE — {len(screenplay['scenes'])} scene(s), {len(shot_list['shots'])} shot(s), "
                 f"{len(assets)} asset(s), {unresolved} unresolved motion assignment(s). Outputs: {generated}"
             )
-        except (OSError, ValueError, KeyError) as exc:
-            logger.exception("Phase 1 failed")
+        except (OSError, ValueError, KeyError, RuntimeError) as exc:
+            logger.exception("Pipeline failed")
             raise PipelineError(str(exc)) from exc
 
     def _analyze(self, config: Any, script: str, logger: logging.Logger) -> dict[str, Any]:
@@ -137,4 +153,3 @@ class Pipeline:
         console.setLevel(logging.DEBUG if self.verbose else logging.WARNING)
         logger.addHandler(console)
         return logger
-

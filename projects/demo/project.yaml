@@ -1,9 +1,9 @@
-project_name: "Phase 1 Demo Anime"
+project_name: "Phase 2 Demo Anime"
 script: script.txt
 preset: preview
 language: vi-VN
 subtitle_language: vi
-render_engine: BLENDER_EEVEE_NEXT
+render_engine: BLENDER_EEVEE
 render_device: AUTO
 output:
   width: 1280
@@ -20,6 +20,33 @@ screenplay:
   analyzer: rules
   ollama_endpoint: http://127.0.0.1:11434
   ollama_model: qwen2.5:3b
+phase2:
+  enabled: true
+  piper_data_dir: ../../tools/piper_voices
+  rhubarb_executable: ../../tools/rhubarb/rhubarb.exe
+  rhubarb_recognizer: phonetic
+  default_voice: vi_female_01
+  silence_before_seconds: 0.08
+  silence_after_seconds: 0.12
+  dialogue_gap_seconds: 0.08
+  normalization_peak: 0.92
+  voices:
+    vi_female_01:
+      model: vi_VN-vais1000-medium
+      length_scale: 1.0
+    vi_male_01:
+      model: vi_VN-vais1000-medium
+      length_scale: 1.12
+  mouth_morph_mapping:
+    A: closed
+    B: I
+    C: E
+    D: A
+    E: O
+    F: U
+    G: closed
+    H: E
+    X: neutral
 characters:
   Aiko:
     model_id: aiko_demo
@@ -34,4 +61,3 @@ characters:
 motion_fallbacks:
   sad_talking: [idle_talking, idle]
   surprised_talking: [surprised, idle_talking, idle]
-

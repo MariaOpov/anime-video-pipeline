@@ -12,7 +12,7 @@ if (-not (Get-Command $PythonCommand -ErrorAction SilentlyContinue)) {
 }
 
 if ($PythonCommand -eq "py") {
-    & $PythonCommand -3.11 -m venv $VenvDirectory
+    & $PythonCommand -3 -m venv $VenvDirectory
 } else {
     & $PythonCommand -m venv $VenvDirectory
 }
@@ -24,4 +24,3 @@ $VenvPython = Join-Path $VenvDirectory "Scripts\python.exe"
 
 Write-Host "Phase 1 setup complete."
 Write-Host "Run: $VenvPython run_pipeline.py --project projects/demo --dry-run"
-

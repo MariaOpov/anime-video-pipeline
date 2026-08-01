@@ -17,6 +17,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Build an anime project from local assets.")
     parser.add_argument("--project", required=True, type=Path, help="Project directory")
     parser.add_argument("--preset", choices=("preview", "balanced", "final"))
+    parser.add_argument("--phase", type=int, choices=(1, 2), default=1,
+                        help="Highest pipeline phase to execute (default: 1)")
     parser.add_argument("--dry-run", action="store_true", help="Validate and plan only")
     parser.add_argument("--resume", action="store_true", help="Skip completed valid stages")
     parser.add_argument("--verbose", action="store_true")
@@ -32,6 +34,7 @@ def main() -> int:
             dry_run=args.dry_run,
             resume=args.resume,
             verbose=args.verbose,
+            phase=args.phase,
         ).run()
     except PipelineError as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
@@ -42,4 +45,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-
