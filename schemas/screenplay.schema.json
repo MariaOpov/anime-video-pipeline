@@ -1,0 +1,81 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["title", "fps", "scenes"],
+  "properties": {
+    "title": {"type": "string", "minLength": 1},
+    "fps": {"type": "integer", "minimum": 1},
+    "scenes": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["scene_id", "location", "time_of_day", "mood", "shots"],
+        "properties": {
+          "scene_id": {"type": "string", "pattern": "^scene_[0-9]{3,}$"},
+          "location": {"type": "string"},
+          "time_of_day": {"type": "string"},
+          "mood": {"type": "string"},
+          "shots": {
+            "type": "array",
+            "minItems": 1,
+            "items": {"$ref": "#/$defs/shot"}
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "$defs": {
+    "shot": {
+      "type": "object",
+      "required": ["shot_id", "duration_seconds", "camera", "characters", "dialogue", "description"],
+      "properties": {
+        "shot_id": {"type": "string", "minLength": 1},
+        "duration_seconds": {"type": "number", "exclusiveMinimum": 0},
+        "description": {"type": "string"},
+        "camera": {
+          "type": "object",
+          "required": ["shot_type", "movement", "target"],
+          "properties": {
+            "shot_type": {"type": "string"},
+            "movement": {"type": "string"},
+            "target": {"type": ["string", "null"]}
+          },
+          "additionalProperties": false
+        },
+        "characters": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name", "position", "action", "emotion", "look_at"],
+            "properties": {
+              "name": {"type": "string"},
+              "position": {"type": "array", "items": {"type": "number"}, "minItems": 3, "maxItems": 3},
+              "action": {"type": "string"},
+              "emotion": {"type": "string"},
+              "look_at": {"type": ["string", "null"]}
+            },
+            "additionalProperties": true
+          }
+        },
+        "dialogue": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["character", "text", "emotion"],
+            "properties": {
+              "character": {"type": "string"},
+              "text": {"type": "string"},
+              "emotion": {"type": "string"}
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}
+
