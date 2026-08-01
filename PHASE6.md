@@ -5,7 +5,8 @@ tested command-line pipeline. The Studio edits `script.txt`, generates a
 schema-constrained motion-intent contract, launches allowlisted pipeline jobs,
 shows incremental logs, previews the final MP4, and renders the Phase 5 release
 gates as a dashboard. Phase 6.1 executes the validated gesture vocabulary in
-Blender; see `PHASE6_1.md` for its deterministic mapping and acceptance flow.
+Blender. Phase 6.2 adds shot-aware performance direction; see `PHASE6_1.md` and
+`PHASE6_2.md` for the deterministic mappings and acceptance flows.
 
 ## Setup and launch
 

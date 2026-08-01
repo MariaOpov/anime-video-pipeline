@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from .config import ProjectConfig
+from .direction import direct_performance
 from .io_utils import atomic_write_json, load_json, validate
 from .motion_ai import validate_motion_intent
 
@@ -68,7 +69,7 @@ class Phase3Planner:
                 "target": camera.get("target"),
             })
 
-        performance = self._build_performance(shots)
+        performance = self._build_performance(shots, timeline)
 
         dialogue = []
         cue_total = 0
@@ -102,7 +103,7 @@ class Phase3Planner:
                             float(timeline.get("total_duration_seconds", 0)))
         output = self.config.data["output"]
         manifest = {
-            "version": 2, "project_name": self.config.data["project_name"],
+            "version": 3, "project_name": self.config.data["project_name"],
             "fps": self.config.fps, "frame_start": 1,
             "frame_end": max(1, math.ceil(total_seconds * self.config.fps)),
             "base_scene": base_scene.relative_to(self.config.project_dir).as_posix(),
@@ -120,7 +121,12 @@ class Phase3Planner:
                         "performance_clip_count": len(performance["clips"]),
                         "gesture_count": sum(
                             len(clip["gestures"]) for clip in performance["clips"]
-                        )},
+                        ),
+                        "dialogue_beat_count": performance["dialogue_beat_count"],
+                        "gaze_target_count": len(performance["gaze_events"]),
+                        "blink_event_count": len(performance["blink_events"]),
+                        "listener_reaction_count": performance["listener_reaction_count"],
+                        "performance_conflict_count": performance["performance_conflict_count"]},
         }
         validate(manifest, self.schemas / "phase3_manifest.schema.json", "Phase 3 manifest")
         return manifest
@@ -147,13 +153,16 @@ class Phase3Planner:
             validate(payload, schema, label)
         return payload
 
-    def _build_performance(self, shots: list[dict[str, Any]]) -> dict[str, Any]:
+    def _build_performance(self, shots: list[dict[str, Any]],
+                           timeline: dict[str, Any]) -> dict[str, Any]:
         settings = self.config.data.get("phase6", {}).get("procedural_gestures", {})
         enabled = bool(settings.get("enabled", True))
         amplitude = float(settings.get("amplitude_scale", 1.0))
         result: dict[str, Any] = {
             "enabled": enabled, "source": None,
-            "amplitude_scale": amplitude, "clips": [],
+            "amplitude_scale": amplitude, "clips": [], "gaze_events": [],
+            "blink_events": [], "dialogue_beat_count": 0,
+            "listener_reaction_count": 0, "performance_conflict_count": 0,
         }
         if not enabled:
             return result
@@ -183,22 +192,10 @@ class Phase3Planner:
             (shot["scene_id"], shot["shot_id"]): (shot["start_frame"], shot["end_frame"])
             for shot in shots
         }
-        clips = []
-        for shot in intent["shots"]:
-            identity = (shot["scene_id"], shot["shot_id"])
-            if identity not in shot_frames:
-                raise ValueError(f"Motion intent references unknown Phase 3 shot: {shot['shot_id']}")
-            start_frame, end_frame = shot_frames[identity]
-            for character in shot["characters"]:
-                clips.append({
-                    "scene_id": shot["scene_id"], "shot_id": shot["shot_id"],
-                    "character": character["name"], "start_frame": start_frame,
-                    "end_frame": end_frame, "action": character["action"],
-                    "emotion": character["emotion"],
-                    "intensity": float(character["intensity"]),
-                    "gestures": list(character["gestures"]),
-                    "look_at": character["look_at"],
-                })
+        directed = direct_performance(
+            screenplay, intent, shot_frames, timeline,
+            self.config.data["project_name"], self.config.fps,
+        )
         result["source"] = intent["source"]
-        result["clips"] = clips
+        result.update(directed)
         return result

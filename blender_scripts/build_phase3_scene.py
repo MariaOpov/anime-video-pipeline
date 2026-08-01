@@ -35,7 +35,10 @@ POSE_BONE_ALIASES = {
     "arm.R": ("arm.R", "upper_arm.R", "右腕"),
     "leg.L": ("leg.L", "thigh.L", "左足"),
     "leg.R": ("leg.R", "thigh.R", "右足"),
+    "eyes": ("eyes", "eye", "両目"),
 }
+
+BLINK_SHAPE_ALIASES = {"blink", "eye_blink", "eyeblink", "まばたき"}
 
 
 def arguments() -> argparse.Namespace:
@@ -134,6 +137,105 @@ def animate_performances(manifest: dict) -> tuple[int, int, int, int, int]:
                 point.handle_right_type = "AUTO_CLAMPED"
     gesture_count = sum(len(clip.get("gestures", [])) for clip in clips)
     return len(armatures), len(clips), gesture_count, inserted, len(skipped_bones)
+
+
+def eye_objects_for(character: str):
+    prefix = f"{character}_Eye_".casefold()
+    return [obj for obj in bpy.data.objects
+            if obj.type == "MESH" and obj.name.casefold().startswith(prefix)]
+
+
+def blink_shape_targets(character: str):
+    armature = armature_for(character)
+    targets = []
+    for obj in bpy.data.objects:
+        if obj.type != "MESH" or not obj.data.shape_keys:
+            continue
+        belongs = obj.name.casefold().startswith(character.casefold())
+        belongs = belongs or obj.parent == armature
+        belongs = belongs or any(
+            modifier.type == "ARMATURE" and modifier.object == armature
+            for modifier in obj.modifiers
+        )
+        if not belongs:
+            continue
+        for block in obj.data.shape_keys.key_blocks:
+            if block.name.casefold() in BLINK_SHAPE_ALIASES:
+                targets.append(block)
+    return targets
+
+
+def animate_blinks(manifest: dict) -> tuple[int, int, int]:
+    events = manifest.get("performance", {}).get("blink_events", [])
+    targets_by_character = {}
+    target_ids = set()
+    inserted = 0
+    applied_events = 0
+    for event in events:
+        character = event["character"]
+        if character not in targets_by_character:
+            shapes = blink_shape_targets(character)
+            eyes = [] if shapes else eye_objects_for(character)
+            targets_by_character[character] = (shapes, eyes)
+            target_ids.update(("shape", id(target)) for target in shapes)
+            target_ids.update(("eye", target.name) for target in eyes)
+        shapes, eyes = targets_by_character[character]
+        close = int(event["close_frame"])
+        opened = int(event["open_frame"])
+        if shapes:
+            for target in shapes:
+                for frame, value in ((max(1, close - 1), 0.0), (close, 1.0), (opened, 0.0)):
+                    target.value = value
+                    target.keyframe_insert(data_path="value", frame=frame, group="PIPE_Blink")
+                    inserted += 1
+            applied_events += 1
+        elif eyes:
+            for eye in eyes:
+                baseline = float(eye.scale.z)
+                for frame, value in ((max(1, close - 1), baseline),
+                                     (close, baseline * 0.08), (opened, baseline)):
+                    eye.scale.z = value
+                    eye.keyframe_insert(data_path="scale", index=2, frame=frame,
+                                        group="PIPE_Blink")
+                    inserted += 1
+            applied_events += 1
+    return len(target_ids), applied_events, inserted
+
+
+def animate_gaze(manifest: dict) -> tuple[int, int]:
+    events = manifest.get("performance", {}).get("gaze_events", [])
+    applied = 0
+    inserted = 0
+    for event in events:
+        armature = armature_for(event["character"])
+        direction = look_direction(armature, event["target"])
+        if not direction:
+            continue
+        start, end = int(event["start_frame"]), int(event["end_frame"])
+        transition = max(2, min(5, (end - start) // 5))
+        eye_bone = pose_bone_for(armature, "eyes")
+        if eye_bone:
+            eye_bone.rotation_mode = "XYZ"
+            for frame, value in ((start, 0.0), (min(end, start + transition), direction * 0.09),
+                                 (max(start, end - transition), direction * 0.09), (end, 0.0)):
+                eye_bone.rotation_euler.z = value
+                eye_bone.keyframe_insert(data_path="rotation_euler", index=2, frame=frame,
+                                         group="PIPE_Gaze")
+                inserted += 1
+            applied += 1
+            continue
+        eyes = eye_objects_for(event["character"])
+        if not eyes:
+            continue
+        for eye in eyes:
+            for frame, value in ((start, 0.0), (min(end, start + transition), direction * 0.018),
+                                 (max(start, end - transition), direction * 0.018), (end, 0.0)):
+                eye.delta_location.x = value
+                eye.keyframe_insert(data_path="delta_location", index=0, frame=frame,
+                                    group="PIPE_Gaze")
+                inserted += 1
+        applied += 1
+    return applied, inserted
 
 
 def mouth_material():
@@ -345,7 +447,10 @@ def configure_scene(project: Path, manifest: dict) -> Path:
 def write_report(project: Path, manifest: dict, *, camera_count: int, audio_count: int,
                  mouth_targets: int, mouth_cues: int, performance_targets: int,
                  performance_clips: int, gestures: int, pose_keyframes: int,
-                 skipped_bones: int, rendered: bool) -> Path:
+                 skipped_bones: int, dialogue_beats: int, gaze_targets: int,
+                 gaze_keyframes: int, blink_targets: int, blink_events: int,
+                 blink_keyframes: int, listener_reactions: int,
+                 performance_conflicts: int, rendered: bool) -> Path:
     output_scene = (project / manifest["output_scene"]).resolve()
     preview = (project / manifest["preview_video"]).resolve()
     report = {
@@ -357,6 +462,12 @@ def write_report(project: Path, manifest: dict, *, camera_count: int, audio_coun
         "performance_clip_count": performance_clips,
         "gesture_count": gestures, "pose_keyframe_count": pose_keyframes,
         "skipped_bone_alias_count": skipped_bones,
+        "dialogue_beat_count": dialogue_beats,
+        "gaze_target_count": gaze_targets, "gaze_keyframe_count": gaze_keyframes,
+        "blink_target_count": blink_targets, "blink_event_count": blink_events,
+        "blink_keyframe_count": blink_keyframes,
+        "listener_reaction_count": listener_reactions,
+        "performance_conflict_count": performance_conflicts,
         "scene_file": output_scene.relative_to(project).as_posix(),
         "preview_video": preview.relative_to(project).as_posix() if rendered else None,
     }
@@ -378,7 +489,10 @@ def main() -> None:
     performance_targets, performance_clips, gestures, pose_keyframes, skipped_bones = (
         animate_performances(manifest)
     )
+    gaze_targets, gaze_keyframes = animate_gaze(manifest)
+    blink_targets, blink_events, blink_keyframes = animate_blinks(manifest)
     mouth_targets, mouth_cues = animate_dialogue(manifest)
+    direction = manifest.get("performance", {})
 
     output_scene = (project / manifest["output_scene"]).resolve()
     output_scene.parent.mkdir(parents=True, exist_ok=True)
@@ -391,12 +505,22 @@ def main() -> None:
         mouth_targets=mouth_targets, mouth_cues=mouth_cues, rendered=args.render,
         performance_targets=performance_targets, performance_clips=performance_clips,
         gestures=gestures, pose_keyframes=pose_keyframes, skipped_bones=skipped_bones,
+        dialogue_beats=int(direction.get("dialogue_beat_count", 0)),
+        gaze_targets=gaze_targets, gaze_keyframes=gaze_keyframes,
+        blink_targets=blink_targets, blink_events=blink_events,
+        blink_keyframes=blink_keyframes,
+        listener_reactions=int(direction.get("listener_reaction_count", 0)),
+        performance_conflicts=int(direction.get("performance_conflict_count", 0)),
     )
     print(
         f"PHASE 3 BLENDER COMPLETE: {camera_count} cameras, {audio_count} audio strips, "
         f"{mouth_cues} mouth cues, {performance_clips} performance clips, "
         f"{gestures} gestures, {pose_keyframes} pose keyframes, "
-        f"{skipped_bones} skipped bone aliases, scene={output_scene}, "
+        f"{direction.get('dialogue_beat_count', 0)} dialogue beats, "
+        f"{gaze_targets} gaze targets/{gaze_keyframes} gaze keys, "
+        f"{blink_events} blinks/{blink_keyframes} blink keys, "
+        f"{direction.get('listener_reaction_count', 0)} listener reactions, "
+        f"{skipped_bones} skipped aliases, scene={output_scene}, "
         f"preview={preview if args.render else 'not rendered'}, report={report}"
     )
 

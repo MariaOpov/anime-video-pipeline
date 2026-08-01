@@ -70,7 +70,7 @@ range is 0.1–3.0; the default is 1.0.
 `generated/phase3_scene_report.json` records performance targets, clips,
 gestures, inserted pose keys, and skipped aliases. A successful demo production
 should report four clips, eight gestures, a positive pose-key count, and zero
-skipped aliases. The final production report adds the
+skipped aliases before Phase 6.2 listener expansion. The final production report adds the
 `procedural_gestures_applied` quality gate.
 
 `wind_sway` animates the character's body. Cloth, hair, and environment wind

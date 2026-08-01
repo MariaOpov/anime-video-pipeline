@@ -32,7 +32,11 @@ def main() -> int:
         f"{summary['dialogue_count']} dialogue strip(s), "
         f"{summary['mouth_cue_count']} mouth cue(s), "
         f"{summary['performance_clip_count']} performance clip(s), "
-        f"{summary['gesture_count']} gesture(s). Output: {output}"
+        f"{summary['gesture_count']} gesture(s), "
+        f"{summary['dialogue_beat_count']} dialogue beat(s), "
+        f"{summary['gaze_target_count']} gaze target(s), "
+        f"{summary['blink_event_count']} blink(s), "
+        f"{summary['listener_reaction_count']} listener reaction(s). Output: {output}"
     )
     return 0
 

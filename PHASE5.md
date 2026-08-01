@@ -54,6 +54,8 @@ time remain in `generated/phase5_run_record.json` for diagnosis.
 - Blender camera, audio-strip, and mouth-cue counts match the validated manifest.
 - Procedural performance clip and gesture counts match, pose keys are non-empty,
   and no required bone alias is skipped.
+- Dialogue beats, gaze, blinks, and listener reactions match the manifest,
+  create real Blender keyframes, and contain zero clip conflicts.
 - The assembled scene and rendered Phase 3 preview exist.
 - The Phase 4 MP4, subtitle count, loudness flag, dimensions, duration, and size pass.
 - The final duration does not exceed `maximum_video_duration`.

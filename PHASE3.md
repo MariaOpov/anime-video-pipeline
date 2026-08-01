@@ -61,4 +61,5 @@ Phase 3 is complete when:
 3. Both mannequin mouths animate during their own dialogue.
 4. `phase3_preview.mp4` contains picture and synchronized speech.
 5. `phase3_scene_report.json` reports 4 cameras, 4 audio strips, 62 mouth cues,
-   4 performance clips, 8 gestures, positive pose keys, and 0 skipped aliases.
+   8 performance clips, 12 gestures, 4 dialogue beats, 8 gaze targets,
+   deterministic blinks, 4 listener reactions, and 0 conflicts/skipped aliases.

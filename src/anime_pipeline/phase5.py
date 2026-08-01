@@ -29,6 +29,10 @@ class Phase5Auditor:
             "dialogue_count": 0, "mouth_cue_count": 0, "timing_warning_count": 0,
             "performance_clip_count": 0, "gesture_count": 0,
             "pose_keyframe_count": 0, "skipped_bone_alias_count": 0,
+            "dialogue_beat_count": 0, "gaze_target_count": 0,
+            "gaze_keyframe_count": 0, "blink_event_count": 0,
+            "blink_keyframe_count": 0, "listener_reaction_count": 0,
+            "performance_conflict_count": 0,
             "duration_seconds": 0, "output_size_bytes": 0, "output_width": 0,
             "output_height": 0, "estimated_cost": 0,
         }
@@ -163,6 +167,11 @@ class Phase5Auditor:
             and int(scene_report.get("mouth_cue_count", -1)) == int(summary["mouth_cue_count"])
             and int(scene_report.get("performance_clip_count", -1)) == int(summary["performance_clip_count"])
             and int(scene_report.get("gesture_count", -1)) == int(summary["gesture_count"])
+            and int(scene_report.get("dialogue_beat_count", -1)) == int(summary["dialogue_beat_count"])
+            and int(scene_report.get("gaze_target_count", -1)) == int(summary["gaze_target_count"])
+            and int(scene_report.get("blink_event_count", -1)) == int(summary["blink_event_count"])
+            and int(scene_report.get("listener_reaction_count", -1)) == int(summary["listener_reaction_count"])
+            and int(scene_report.get("performance_conflict_count", -1)) == int(summary["performance_conflict_count"])
         )
         self._gate(3, "blender_assembly_counts_match", counts_match, summary, {
             "shot_count": scene_report.get("camera_count"),
@@ -170,6 +179,11 @@ class Phase5Auditor:
             "mouth_cue_count": scene_report.get("mouth_cue_count"),
             "performance_clip_count": scene_report.get("performance_clip_count"),
             "gesture_count": scene_report.get("gesture_count"),
+            "dialogue_beat_count": scene_report.get("dialogue_beat_count"),
+            "gaze_target_count": scene_report.get("gaze_target_count"),
+            "blink_event_count": scene_report.get("blink_event_count"),
+            "listener_reaction_count": scene_report.get("listener_reaction_count"),
+            "performance_conflict_count": scene_report.get("performance_conflict_count"),
         })
         expected_clips = int(summary["performance_clip_count"])
         pose_keyframes = int(scene_report.get("pose_keyframe_count", 0))
@@ -182,6 +196,32 @@ class Phase5Auditor:
                    "all performance clips keyed with 0 skipped bone aliases", {
                        "performance_clips": scene_report.get("performance_clip_count"),
                        "pose_keyframes": pose_keyframes, "skipped_bone_aliases": skipped_bones,
+                   })
+        expected_gaze = int(summary["gaze_target_count"])
+        expected_blinks = int(summary["blink_event_count"])
+        gaze_keys = int(scene_report.get("gaze_keyframe_count", 0))
+        blink_keys = int(scene_report.get("blink_keyframe_count", 0))
+        conflicts = int(scene_report.get("performance_conflict_count", -1))
+        direction_ok = (
+            int(scene_report.get("dialogue_beat_count", -1)) == int(summary["dialogue_beat_count"])
+            and int(scene_report.get("listener_reaction_count", -1)) == int(summary["listener_reaction_count"])
+            and conflicts == 0 and int(summary["performance_conflict_count"]) == 0
+            and (expected_gaze == 0 or (
+                int(scene_report.get("gaze_target_count", -1)) == expected_gaze and gaze_keys > 0
+            ))
+            and (expected_blinks == 0 or (
+                int(scene_report.get("blink_event_count", -1)) == expected_blinks and blink_keys > 0
+            ))
+        )
+        self._gate(3, "performance_direction_applied", direction_ok,
+                   "all dialogue beats, gaze, blinks, and listener reactions applied with 0 conflicts", {
+                       "dialogue_beats": scene_report.get("dialogue_beat_count"),
+                       "gaze_targets": scene_report.get("gaze_target_count"),
+                       "gaze_keyframes": gaze_keys,
+                       "blink_events": scene_report.get("blink_event_count"),
+                       "blink_keyframes": blink_keys,
+                       "listener_reactions": scene_report.get("listener_reaction_count"),
+                       "conflicts": conflicts,
                    })
         scene_path = self._resolve_project_relative(scene_report.get("scene_file", ""))
         preview_path = self._resolve_project_relative(scene_report.get("preview_video", ""))
@@ -200,6 +240,11 @@ class Phase5Auditor:
             "gesture_count": int(summary["gesture_count"]),
             "pose_keyframe_count": pose_keyframes,
             "skipped_bone_alias_count": skipped_bones,
+            "dialogue_beat_count": int(summary["dialogue_beat_count"]),
+            "gaze_target_count": expected_gaze, "gaze_keyframe_count": gaze_keys,
+            "blink_event_count": expected_blinks, "blink_keyframe_count": blink_keys,
+            "listener_reaction_count": int(summary["listener_reaction_count"]),
+            "performance_conflict_count": conflicts,
         })
         return manifest
 

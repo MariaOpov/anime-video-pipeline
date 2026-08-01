@@ -1,4 +1,4 @@
-# Anime Video Pipeline — Phase 6.1
+# Anime Video Pipeline — Phase 6.2
 
 A Windows-first foundation for an offline, reusable anime production pipeline.
 Phase 1 turns a text script into validated screenplay and shot-list JSON, indexes
@@ -13,6 +13,8 @@ every configured quality gate passes. Phase 6 adds a local web Studio and
 schema-constrained Ollama motion planning. Phase 6.1 turns the validated
 semantic gestures into bounded Blender pose keyframes while preserving the
 deterministic asset resolver and fixed bone aliases as the final authority.
+Phase 6.2 directs those poses around dialogue beats, inferred gaze, deterministic
+blinks, emotional posture, and subtle listener reactions.
 
 ## Architecture
 
@@ -215,6 +217,20 @@ The demo rules produce eight gestures across four shots: wind/body sway in the
 opening, Ren looking down while apologizing, Aiko tilting her head for the
 question, and Ren nodding in the final affirmation. `wind_sway` moves the body;
 cloth and hair physics remain model-specific future work.
+
+## Phase 6.2 Performance Director
+
+Phase 6.2 expands the four speaker clips into eight shot-aware performances:
+four speakers and four listeners. It infers Aiko/Ren look targets, aligns the
+discrete gestures to exact dialogue ranges, schedules reproducible blinks,
+adds emotional resting posture, and gives the listener a small reaction beat.
+The Studio renders these clips and their beats on a performance timeline.
+
+The Phase 3 manifest is version 3 and records dialogue beats, gaze events,
+blink events, listeners, and overlap conflicts. Blender supports common MMD
+`blink`/`まばたき` morphs and uses the demo eye meshes as a fallback. Phase 5
+requires the requested gaze/blink events to produce real keyframes and raises
+the complete demo audit to 29 gates. See `PHASE6_2.md`.
 
 ## Asset metadata
 
