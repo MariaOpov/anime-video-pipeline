@@ -1,10 +1,12 @@
-# Anime Video Pipeline — Phase 2
+# Anime Video Pipeline — Phase 3
 
 A Windows-first foundation for an offline, reusable anime production pipeline.
 Phase 1 turns a text script into validated screenplay and shot-list JSON, indexes
 local assets, and selects motions with deterministic fallbacks. Phase 2 adds
 offline Piper speech, exact dialogue timing, recorded-voice overrides, and
-Rhubarb mouth cues mapped to configurable MMD/Blender morph names.
+Rhubarb mouth cues mapped to configurable MMD/Blender morph names. Phase 3
+assembles those contracts inside Blender as shot cameras, synchronized audio,
+and animated mouth shape keys.
 
 ## Architecture
 
@@ -33,6 +35,9 @@ Dialogue timeline ---------> Rhubarb phonetic recognizer
           |
           v
 screenplay.json + dialogue_timeline.json + lip_sync/*.json
+          |
+          v
+Phase 3 manifest ----------> Blender cameras + WAV strips + mouth keys
 ```
 
 The pipeline is stage-based and idempotent. Each completed stage is recorded in
@@ -61,6 +66,17 @@ python run_pipeline.py --project projects/demo --phase 2 --preset preview
 uses `vi_VN-vais1000-medium`; its source dataset is CC BY 4.0, so productions
 that use this voice must provide attribution. Piper and Rhubarb retain their
 own upstream licenses and are not redistributed by this repository.
+
+Assemble a Blender scene after Phase 2:
+
+```powershell
+.\run_phase3.ps1
+.\run_phase3.ps1 -Render
+```
+
+The first command creates the editable `.blend`; `-Render` also renders the
+configured preview MP4. The demo uses 50% resolution for a faster acceptance
+render while retaining the project's 24 fps timeline.
 
 Optional local LLM:
 
@@ -93,6 +109,17 @@ To replace generated speech, put a 16-bit PCM WAV at
 never modified. For Vietnamese and other non-English dialogue, use Rhubarb's
 `phonetic` recognizer; English projects may choose `pocketSphinx`.
 
+## Phase 3 outputs
+
+- `generated/phase3_manifest.json`: validated Blender assembly contract.
+- `blender_scenes/phase3_assembled.blend`: cameras, sound strips, and mouth keys.
+- `generated/phase3_scene_report.json`: machine-readable assembly result.
+- `renders/phase3_preview.mp4`: optional Blender preview with dialogue audio.
+
+Phase 3 opens the configured base scene read-only and saves to a separate output
+scene. The demo creates non-destructive fallback mouth controls; real MMD models
+can expose their own configured morph names instead.
+
 ## Asset metadata
 
 Place one `.asset.yaml` sidecar anywhere below an asset-library directory. The
@@ -113,7 +140,6 @@ production outputs. Use `--verbose` for console debug messages.
 
 ## Next phases
 
-1. Blender applies Phase 2 mouth cues to model shape keys.
-2. Blender import, retargeting, placement, cameras, preview rendering.
-3. FFmpeg audio mix, subtitles, and final export.
-4. Optional ComfyUI and improved emotional animation.
+1. FFmpeg audio mix, subtitles, and final export.
+2. Package orchestration, quality gates, and one-command production.
+3. Optional ComfyUI and improved emotional animation.

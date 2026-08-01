@@ -1,0 +1,61 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["version", "project_name", "fps", "frame_start", "frame_end", "base_scene", "output_scene", "preview_video", "render", "camera", "shots", "dialogue", "summary"],
+  "properties": {
+    "version": {"const": 1},
+    "project_name": {"type": "string", "minLength": 1},
+    "fps": {"type": "integer", "minimum": 1},
+    "frame_start": {"type": "integer", "minimum": 1},
+    "frame_end": {"type": "integer", "minimum": 1},
+    "base_scene": {"type": "string", "minLength": 1},
+    "output_scene": {"type": "string", "minLength": 1},
+    "preview_video": {"type": "string", "minLength": 1},
+    "render": {
+      "type": "object", "required": ["engine", "width", "height", "resolution_percentage"],
+      "properties": {
+        "engine": {"type": "string"}, "width": {"type": "integer", "minimum": 320},
+        "height": {"type": "integer", "minimum": 240},
+        "resolution_percentage": {"type": "integer", "minimum": 1, "maximum": 100}
+      }, "additionalProperties": false
+    },
+    "camera": {"type": "object"},
+    "shots": {
+      "type": "array", "minItems": 1,
+      "items": {
+        "type": "object", "required": ["scene_id", "shot_id", "start_frame", "end_frame", "shot_type", "movement", "target"],
+        "properties": {
+          "scene_id": {"type": "string"}, "shot_id": {"type": "string"},
+          "start_frame": {"type": "integer", "minimum": 1},
+          "end_frame": {"type": "integer", "minimum": 1},
+          "shot_type": {"type": "string"}, "movement": {"type": "string"},
+          "target": {"type": ["string", "null"]}
+        }, "additionalProperties": false
+      }
+    },
+    "dialogue": {
+      "type": "array",
+      "items": {
+        "type": "object", "required": ["line_id", "shot_id", "character", "audio_path", "start_frame", "end_frame", "start_seconds", "duration_seconds", "mouth_cues"],
+        "properties": {
+          "line_id": {"type": "string"}, "shot_id": {"type": "string"},
+          "character": {"type": "string"}, "audio_path": {"type": "string"},
+          "start_frame": {"type": "integer", "minimum": 1},
+          "end_frame": {"type": "integer", "minimum": 1},
+          "start_seconds": {"type": "number", "minimum": 0},
+          "duration_seconds": {"type": "number", "exclusiveMinimum": 0},
+          "mouth_cues": {"type": "array", "items": {"type": "object"}}
+        }, "additionalProperties": false
+      }
+    },
+    "summary": {
+      "type": "object", "required": ["shot_count", "dialogue_count", "mouth_cue_count"],
+      "properties": {
+        "shot_count": {"type": "integer", "minimum": 1},
+        "dialogue_count": {"type": "integer", "minimum": 0},
+        "mouth_cue_count": {"type": "integer", "minimum": 0}
+      }, "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

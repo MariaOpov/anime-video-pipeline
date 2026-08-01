@@ -16,9 +16,9 @@
 3. **Asset layer** — metadata index, licensing checks, compatibility search.
 4. **Animation plan** — motion selection and deterministic fallback chains.
 5. **Dialogue layer (Phase 2)** — Piper/recorded WAV, normalization, timing, Rhubarb cues.
-6. **Blender layer (Phase 3)** — import, retarget, face animation, lighting, cameras.
+6. **Blender layer (Phase 3)** — validated manifest, shot cameras, audio strips, face animation.
 7. **Media layer (Phase 4)** — subtitles, audio mix, and FFmpeg export.
-7. **Operations layer** — logs, atomic outputs, stage state, dry-run, resume.
+8. **Operations layer** — logs, atomic outputs, stage state, dry-run, resume.
 
 ## Project directory contract
 
@@ -52,6 +52,11 @@ project/
 Phase 2 adds `dialogue_timeline.json`, one WAV and transcript per line, and one
 validated lip-sync JSON per line. Later phases consume these stable contracts
 instead of reparsing raw script text inside Blender.
+
+Phase 3 adds `phase3_manifest.json` as the trust boundary between system Python
+and Blender. Blender consumes only resolved shots, frame ranges, audio paths,
+camera instructions, and validated mouth cues. It produces an assembled scene,
+an optional preview MP4, and `phase3_scene_report.json`.
 
 ## Failure boundaries
 

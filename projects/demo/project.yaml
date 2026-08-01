@@ -47,6 +47,16 @@ phase2:
     G: closed
     H: E
     X: neutral
+phase3:
+  enabled: true
+  base_scene: blender_scenes/demo_mannequins.blend
+  output_scene: blender_scenes/phase3_assembled.blend
+  preview_video: renders/phase3_preview.mp4
+  resolution_percentage: 50
+  camera:
+    close_up_distance: 4.2
+    medium_distance: 6.4
+    wide_distance: 8.6
 characters:
   Aiko:
     model_id: aiko_demo
