@@ -1,7 +1,8 @@
 [CmdletBinding()]
 param(
     [string]$Blender = "D:\Blender_5.1\blender.exe",
-    [string]$Project = "projects\demo"
+    [string]$Project = "projects\demo",
+    [switch]$SkipPhase1
 )
 
 $ErrorActionPreference = "Stop"
@@ -30,8 +31,9 @@ if ($MissingOutputs.Count -gt 0) {
     throw "Blender finished without creating: $($MissingOutputs -join ', ')"
 }
 
-& ".venv\Scripts\python.exe" run_pipeline.py --project $Project --preset preview
-if ($LASTEXITCODE -ne 0) { throw "Phase 1 refresh failed with exit code $LASTEXITCODE" }
+if (-not $SkipPhase1) {
+    & ".venv\Scripts\python.exe" run_pipeline.py --project $Project --preset preview
+    if ($LASTEXITCODE -ne 0) { throw "Phase 1 refresh failed with exit code $LASTEXITCODE" }
+}
 
 Write-Host "Step 2 complete. Open: $Project\blender_scenes\demo_mannequins.blend"
-

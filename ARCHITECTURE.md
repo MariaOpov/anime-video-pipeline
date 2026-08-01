@@ -18,7 +18,8 @@
 5. **Dialogue layer (Phase 2)** — Piper/recorded WAV, normalization, timing, Rhubarb cues.
 6. **Blender layer (Phase 3)** — validated manifest, shot cameras, audio strips, face animation.
 7. **Media layer (Phase 4)** — SRT generation, loudness normalization, final MP4 export.
-8. **Operations layer** — logs, atomic outputs, stage state, dry-run, resume.
+8. **Operations layer (Phase 5)** — one-command orchestration, logs, QA gates,
+   atomic outputs, stage timing, dry-run, and resume.
 
 ## Project directory contract
 
@@ -38,7 +39,9 @@ project/
 │   ├── shot_list.json
 │   ├── asset_index.json
 │   ├── motion_plan.json
-│   └── pipeline_state.json
+│   ├── pipeline_state.json
+│   ├── phase5_run_record.json
+│   └── production_report.json
 ├── dialogue/
 ├── lip_sync/
 ├── subtitles/
@@ -63,6 +66,12 @@ timeline. It generates UTF-8 SRT, chooses burned or soft subtitles based on the
 local FFmpeg build, normalizes dialogue loudness, exports `final_video.mp4`, and
 probes the result before writing `phase4_report.json`.
 
+Phase 5 treats all earlier outputs as a release candidate. It compares counts
+across contracts, checks every material artifact, enforces project thresholds,
+records tool versions and stage durations, and writes a schema-validated
+`production_report.json`. A failed gate creates a failed report and returns a
+non-zero exit code.
+
 ## Failure boundaries
 
 - Invalid configuration stops before any production output is written.
@@ -71,6 +80,8 @@ probes the result before writing `phase4_report.json`.
 - A missing exact action follows the configured chain and finally tries `idle`.
 - JSON outputs use atomic replacement, avoiding half-written files after a crash.
 - Resume skips only a completed stage whose recorded output still exists.
+- One-command production stops at the first execution failure; the final audit
+  reports all detectable quality failures together.
 
 ## Security and licensing
 
