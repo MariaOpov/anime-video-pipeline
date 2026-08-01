@@ -1,4 +1,4 @@
-# Anime Video Pipeline — Phase 6.2
+# Anime Video Pipeline — Phase 6.3
 
 A Windows-first foundation for an offline, reusable anime production pipeline.
 Phase 1 turns a text script into validated screenplay and shot-list JSON, indexes
@@ -14,7 +14,9 @@ schema-constrained Ollama motion planning. Phase 6.1 turns the validated
 semantic gestures into bounded Blender pose keyframes while preserving the
 deterministic asset resolver and fixed bone aliases as the final authority.
 Phase 6.2 directs those poses around dialogue beats, inferred gaze, deterministic
-blinks, emotional posture, and subtle listener reactions.
+blinks, emotional posture, and subtle listener reactions. Phase 6.3 adds stable
+character staging, body facing, shot composition, bounded camera moves, and a
+blocking safety audit.
 
 ## Architecture
 
@@ -50,7 +52,7 @@ Dialogue timeline ---------> Rhubarb phonetic recognizer
 screenplay.json + dialogue_timeline.json + lip_sync/*.json
           |
           v
-Phase 3 manifest ----------> Blender cameras + WAV strips + mouth/pose keys
+Phase 3 manifest ----------> Blender blocking/cameras + WAV + mouth/pose keys
           |
           v
 Phase 3 preview -----------> SRT + loudness normalization + final MP4
@@ -165,7 +167,7 @@ never modified. For Vietnamese and other non-English dialogue, use Rhubarb's
 
 ## Phase 3 outputs
 
-- `generated/phase3_manifest.json`: validated Blender assembly contract.
+- `generated/phase3_manifest.json`: validated Blender assembly and blocking contract.
 - `blender_scenes/phase3_assembled.blend`: cameras, sound strips, mouth keys,
   and procedural body-pose keyframes.
 - `generated/phase3_scene_report.json`: machine-readable assembly result.
@@ -226,11 +228,24 @@ discrete gestures to exact dialogue ranges, schedules reproducible blinks,
 adds emotional resting posture, and gives the listener a small reaction beat.
 The Studio renders these clips and their beats on a performance timeline.
 
-The Phase 3 manifest is version 3 and records dialogue beats, gaze events,
+The Phase 3 manifest records dialogue beats, gaze events,
 blink events, listeners, and overlap conflicts. Blender supports common MMD
 `blink`/`まばたき` morphs and uses the demo eye meshes as a fallback. Phase 5
 requires the requested gaze/blink events to produce real keyframes and raises
 the complete demo audit to 29 gates. See `PHASE6_2.md`.
+
+## Phase 6.3 Cinematic Blocking Director
+
+Phase 6.3 places recurring characters on a stable stage, turns their bodies
+toward validated look targets, selects a deterministic composition per shot,
+and inserts subtle camera transform keys. The four-shot demo uses a two-shot,
+a close-up, and over-shoulder framing while preserving Aiko/Ren screen order.
+
+The manifest is version 4 and carries placement, body-facing, lens, camera
+movement, and pre-Blender risk metrics. Blender reports the transforms it
+actually keyed. Phase 5 rejects missing keys or any framing, collision,
+continuity, or placement risk, raising the complete demo audit to 30 gates.
+See `PHASE6_3.md`.
 
 ## Asset metadata
 
@@ -255,5 +270,5 @@ production outputs. Use `--verbose` for console debug messages.
 ## Possible extensions
 
 1. Optional ComfyUI backgrounds and image-to-video inserts.
-2. Import and retarget a production MMD character/motion library.
-3. Eye animation, richer emotional posing, and model-specific cloth/hair wind.
+2. Import, normalize, and retarget a production MMD character/motion library.
+3. Environment-aware blocking, occlusion checks, and model-specific cloth/hair wind.

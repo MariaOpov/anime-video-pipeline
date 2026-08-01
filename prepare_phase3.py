@@ -36,7 +36,11 @@ def main() -> int:
         f"{summary['dialogue_beat_count']} dialogue beat(s), "
         f"{summary['gaze_target_count']} gaze target(s), "
         f"{summary['blink_event_count']} blink(s), "
-        f"{summary['listener_reaction_count']} listener reaction(s). Output: {output}"
+        f"{summary['listener_reaction_count']} listener reaction(s), "
+        f"{summary['blocking_shot_count']} blocking shot(s), "
+        f"{summary['character_placement_count']} placement(s), "
+        f"{summary['camera_motion_count']} camera move(s), "
+        f"{summary['framing_risk_count']} framing risk(s). Output: {output}"
     )
     return 0
 

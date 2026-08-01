@@ -33,6 +33,11 @@ class Phase5Auditor:
             "gaze_keyframe_count": 0, "blink_event_count": 0,
             "blink_keyframe_count": 0, "listener_reaction_count": 0,
             "performance_conflict_count": 0,
+            "blocking_shot_count": 0, "character_placement_count": 0,
+            "body_facing_count": 0, "placement_keyframe_count": 0,
+            "camera_motion_count": 0, "camera_keyframe_count": 0,
+            "framing_risk_count": 0, "camera_collision_risk_count": 0,
+            "continuity_violation_count": 0, "blocking_conflict_count": 0,
             "duration_seconds": 0, "output_size_bytes": 0, "output_width": 0,
             "output_height": 0, "estimated_cost": 0,
         }
@@ -172,6 +177,14 @@ class Phase5Auditor:
             and int(scene_report.get("blink_event_count", -1)) == int(summary["blink_event_count"])
             and int(scene_report.get("listener_reaction_count", -1)) == int(summary["listener_reaction_count"])
             and int(scene_report.get("performance_conflict_count", -1)) == int(summary["performance_conflict_count"])
+            and int(scene_report.get("blocking_shot_count", -1)) == int(summary["blocking_shot_count"])
+            and int(scene_report.get("character_placement_count", -1)) == int(summary["character_placement_count"])
+            and int(scene_report.get("body_facing_count", -1)) == int(summary["body_facing_count"])
+            and int(scene_report.get("camera_motion_count", -1)) == int(summary["camera_motion_count"])
+            and int(scene_report.get("framing_risk_count", -1)) == int(summary["framing_risk_count"])
+            and int(scene_report.get("camera_collision_risk_count", -1)) == int(summary["camera_collision_risk_count"])
+            and int(scene_report.get("continuity_violation_count", -1)) == int(summary["continuity_violation_count"])
+            and int(scene_report.get("blocking_conflict_count", -1)) == int(summary["blocking_conflict_count"])
         )
         self._gate(3, "blender_assembly_counts_match", counts_match, summary, {
             "shot_count": scene_report.get("camera_count"),
@@ -184,6 +197,14 @@ class Phase5Auditor:
             "blink_event_count": scene_report.get("blink_event_count"),
             "listener_reaction_count": scene_report.get("listener_reaction_count"),
             "performance_conflict_count": scene_report.get("performance_conflict_count"),
+            "blocking_shot_count": scene_report.get("blocking_shot_count"),
+            "character_placement_count": scene_report.get("character_placement_count"),
+            "body_facing_count": scene_report.get("body_facing_count"),
+            "camera_motion_count": scene_report.get("camera_motion_count"),
+            "framing_risk_count": scene_report.get("framing_risk_count"),
+            "camera_collision_risk_count": scene_report.get("camera_collision_risk_count"),
+            "continuity_violation_count": scene_report.get("continuity_violation_count"),
+            "blocking_conflict_count": scene_report.get("blocking_conflict_count"),
         })
         expected_clips = int(summary["performance_clip_count"])
         pose_keyframes = int(scene_report.get("pose_keyframe_count", 0))
@@ -223,6 +244,41 @@ class Phase5Auditor:
                        "listener_reactions": scene_report.get("listener_reaction_count"),
                        "conflicts": conflicts,
                    })
+        expected_blocking_shots = int(summary["blocking_shot_count"])
+        expected_placements = int(summary["character_placement_count"])
+        expected_body_facings = int(summary["body_facing_count"])
+        expected_camera_moves = int(summary["camera_motion_count"])
+        placement_keys = int(scene_report.get("placement_keyframe_count", 0))
+        camera_keys = int(scene_report.get("camera_keyframe_count", 0))
+        blocking_ok = (
+            int(scene_report.get("blocking_shot_count", -1)) == expected_blocking_shots
+            and int(scene_report.get("character_placement_count", -1)) == expected_placements
+            and int(scene_report.get("body_facing_count", -1)) == expected_body_facings
+            and int(scene_report.get("camera_motion_count", -1)) == expected_camera_moves
+            and (expected_placements == 0 or placement_keys > 0)
+            and (expected_camera_moves == 0 or camera_keys > 0)
+            and int(scene_report.get("framing_risk_count", -1)) == 0
+            and int(scene_report.get("camera_collision_risk_count", -1)) == 0
+            and int(scene_report.get("continuity_violation_count", -1)) == 0
+            and int(scene_report.get("blocking_conflict_count", -1)) == 0
+            and int(summary["framing_risk_count"]) == 0
+            and int(summary["camera_collision_risk_count"]) == 0
+            and int(summary["continuity_violation_count"]) == 0
+            and int(summary["blocking_conflict_count"]) == 0
+        )
+        self._gate(3, "cinematic_blocking_applied", blocking_ok,
+                   "all blocking/camera plans keyed with 0 framing, collision, continuity, or overlap risks", {
+                       "blocking_shots": scene_report.get("blocking_shot_count"),
+                       "placements": scene_report.get("character_placement_count"),
+                       "body_facings": scene_report.get("body_facing_count"),
+                       "placement_keys": placement_keys,
+                       "camera_moves": scene_report.get("camera_motion_count"),
+                       "camera_keys": camera_keys,
+                       "framing_risks": scene_report.get("framing_risk_count"),
+                       "camera_collision_risks": scene_report.get("camera_collision_risk_count"),
+                       "continuity_violations": scene_report.get("continuity_violation_count"),
+                       "blocking_conflicts": scene_report.get("blocking_conflict_count"),
+                   })
         scene_path = self._resolve_project_relative(scene_report.get("scene_file", ""))
         preview_path = self._resolve_project_relative(scene_report.get("preview_video", ""))
         artifacts_exist = scene_path.is_file() and preview_path.is_file() and preview_path.stat().st_size > 0
@@ -245,6 +301,16 @@ class Phase5Auditor:
             "blink_event_count": expected_blinks, "blink_keyframe_count": blink_keys,
             "listener_reaction_count": int(summary["listener_reaction_count"]),
             "performance_conflict_count": conflicts,
+            "blocking_shot_count": expected_blocking_shots,
+            "character_placement_count": expected_placements,
+            "body_facing_count": expected_body_facings,
+            "placement_keyframe_count": placement_keys,
+            "camera_motion_count": expected_camera_moves,
+            "camera_keyframe_count": camera_keys,
+            "framing_risk_count": int(scene_report.get("framing_risk_count", 0)),
+            "camera_collision_risk_count": int(scene_report.get("camera_collision_risk_count", 0)),
+            "continuity_violation_count": int(scene_report.get("continuity_violation_count", 0)),
+            "blocking_conflict_count": int(scene_report.get("blocking_conflict_count", 0)),
         })
         return manifest
 

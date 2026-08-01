@@ -25,13 +25,17 @@ class Phase3Tests(unittest.TestCase):
             self._write_fixture(project)
             manifest = Phase3Planner(self._config(project), self.schemas).build()
             self.assertEqual(manifest["frame_end"], 48)
-            self.assertEqual(manifest["version"], 3)
+            self.assertEqual(manifest["version"], 4)
             self.assertEqual(manifest["summary"], {
                 "shot_count": 1, "dialogue_count": 1, "mouth_cue_count": 2,
                 "performance_clip_count": 0, "gesture_count": 0,
                 "dialogue_beat_count": 0, "gaze_target_count": 0,
                 "blink_event_count": 0, "listener_reaction_count": 0,
                 "performance_conflict_count": 0,
+                "blocking_shot_count": 0, "character_placement_count": 0,
+                "body_facing_count": 0, "camera_motion_count": 0,
+                "framing_risk_count": 0, "camera_collision_risk_count": 0,
+                "continuity_violation_count": 0, "blocking_conflict_count": 0,
             })
             self.assertEqual(manifest["dialogue"][0]["mouth_cues"][1]["mouth_shape"], "A")
 
@@ -47,6 +51,21 @@ class Phase3Tests(unittest.TestCase):
             self.assertEqual(manifest["performance"]["clips"][0]["role"], "speaker")
             self.assertEqual(manifest["summary"]["dialogue_beat_count"], 1)
             self.assertEqual(manifest["summary"]["performance_conflict_count"], 0)
+
+    def test_builds_cinematic_blocking_when_enabled(self):
+        with tempfile.TemporaryDirectory() as directory:
+            project = Path(directory)
+            self._write_fixture(project, with_intent=True)
+            config = self._config(project)
+            config.data["phase6"] = {
+                "cinematic_blocking": {"enabled": True, "camera_motion_enabled": True}
+            }
+            manifest = Phase3Planner(config, self.schemas).build()
+            self.assertTrue(manifest["blocking"]["enabled"])
+            self.assertEqual(manifest["summary"]["blocking_shot_count"], 1)
+            self.assertEqual(manifest["summary"]["character_placement_count"], 1)
+            self.assertEqual(manifest["summary"]["framing_risk_count"], 0)
+            self.assertEqual(manifest["summary"]["blocking_conflict_count"], 0)
 
     def test_rejects_lip_sync_identity_mismatch(self):
         with tempfile.TemporaryDirectory() as directory:

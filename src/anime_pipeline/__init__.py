@@ -1,3 +1,3 @@
 """Offline-first anime production pipeline."""
 
-__version__ = "0.6.2"
+__version__ = "0.6.3"

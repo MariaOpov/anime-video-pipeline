@@ -30,9 +30,13 @@ const elements = {
   metricCues: document.querySelector("#metric-cues"),
   metricGestures: document.querySelector("#metric-gestures"),
   metricGesturesDetail: document.querySelector("#metric-gestures-detail"),
+  metricCamera: document.querySelector("#metric-camera"),
+  metricCameraDetail: document.querySelector("#metric-camera-detail"),
   metricCost: document.querySelector("#metric-cost"),
   directionSummary: document.querySelector("#direction-summary"),
   directionTimeline: document.querySelector("#direction-timeline"),
+  blockingSummary: document.querySelector("#blocking-summary"),
+  blockingTimeline: document.querySelector("#blocking-timeline"),
   toast: document.querySelector("#toast"),
 };
 
@@ -105,6 +109,8 @@ function renderReport(report) {
     elements.metricCues.textContent = "—";
     elements.metricGestures.textContent = "—";
     elements.metricGesturesDetail.textContent = "Procedural performance";
+    elements.metricCamera.textContent = "—";
+    elements.metricCameraDetail.textContent = "Cinematic blocking";
     setChip(elements.qualityChip, "No report", "muted");
     elements.qualityList.replaceChildren();
     const empty = document.createElement("p");
@@ -119,6 +125,8 @@ function renderReport(report) {
   elements.metricCues.textContent = summary.mouth_cue_count;
   elements.metricGestures.textContent = summary.gesture_count ?? 0;
   elements.metricGesturesDetail.textContent = `${summary.pose_keyframe_count ?? 0} pose · ${summary.blink_event_count ?? 0} blink`;
+  elements.metricCamera.textContent = summary.camera_motion_count ?? 0;
+  elements.metricCameraDetail.textContent = `${summary.character_placement_count ?? 0} placements · ${summary.camera_keyframe_count ?? 0} keys`;
   elements.metricCost.textContent = `$${summary.estimated_cost}`;
   setChip(elements.qualityChip, report.status.toUpperCase(), report.status === "complete" ? "ok" : "danger");
   elements.qualityList.replaceChildren();
@@ -197,6 +205,58 @@ function renderDirection(manifest, report) {
   }
 }
 
+function renderBlocking(manifest, report) {
+  const blocking = manifest?.blocking;
+  const summary = manifest?.summary;
+  elements.blockingTimeline.replaceChildren();
+  if (!blocking?.shots?.length || !summary) {
+    elements.blockingSummary.textContent = "Chưa có manifest";
+    const empty = document.createElement("p");
+    empty.className = "empty-copy";
+    empty.textContent = "Chạy production để tạo placements, body facing và camera moves.";
+    elements.blockingTimeline.append(empty);
+    return;
+  }
+  const risks = (summary.framing_risk_count ?? 0) +
+    (summary.camera_collision_risk_count ?? 0) +
+    (summary.continuity_violation_count ?? 0) +
+    (summary.blocking_conflict_count ?? 0);
+  elements.blockingSummary.textContent =
+    `${summary.blocking_shot_count} shot · ${summary.character_placement_count} placement · ` +
+    `${summary.camera_motion_count} camera move · ${risks} risk`;
+  elements.blockingSummary.classList.toggle("danger", risks > 0);
+  const frameStart = Number(manifest.frame_start);
+  const span = Math.max(1, Number(manifest.frame_end) - frameStart);
+  blocking.shots.forEach(shot => {
+    const row = document.createElement("div");
+    row.className = "timeline-row";
+    const label = document.createElement("div");
+    label.className = "timeline-label";
+    const composition = document.createElement("strong");
+    composition.textContent = shot.composition.replaceAll("_", " ");
+    const detail = document.createElement("small");
+    detail.textContent = `${shot.subject}${shot.listener ? ` → ${shot.listener}` : ""} · ${shot.shot_id.replace("scene_001_", "")}`;
+    label.append(composition, detail);
+    const track = document.createElement("div");
+    track.className = "timeline-track";
+    const segment = document.createElement("div");
+    const movement = shot.camera.movement;
+    segment.className = `timeline-segment camera ${movement === "static" ? "static" : ""}`;
+    segment.style.left = `${100 * (shot.start_frame - frameStart) / span}%`;
+    segment.style.width = `${Math.max(1.2, 100 * (shot.end_frame - shot.start_frame) / span)}%`;
+    segment.title = `${movement.replaceAll("_", " ")} · ${shot.camera.lens_mm}mm · ${shot.placements.length} placement(s)`;
+    track.append(segment);
+    row.append(label, track);
+    elements.blockingTimeline.append(row);
+  });
+  const applied = report?.summary;
+  if (applied) {
+    elements.blockingSummary.title =
+      `${applied.placement_keyframe_count ?? 0} placement keys · ` +
+      `${applied.camera_keyframe_count ?? 0} camera keys`;
+  }
+}
+
 async function loadDocument(name) {
   try { return await api(`/api/documents/${name}`); }
   catch (error) {
@@ -222,6 +282,7 @@ async function loadStatus() {
     renderMotion(motion);
     renderReport(report);
     renderDirection(manifest, report);
+    renderBlocking(manifest, report);
     refreshVideo(status.artifacts.final_video);
     if (status.job?.status === "running") {
       jobOffset = 0;
