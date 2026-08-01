@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["project_name", "output", "language", "maximum_video_duration", "maximum_allowed_cost"],
+  "properties": {
+    "project_name": {"type": "string", "minLength": 1},
+    "script": {"type": "string", "default": "script.txt"},
+    "preset": {"enum": ["preview", "balanced", "final"]},
+    "language": {"type": "string", "minLength": 2},
+    "subtitle_language": {"type": "string"},
+    "render_engine": {"enum": ["BLENDER_EEVEE_NEXT", "BLENDER_WORKBENCH"]},
+    "render_device": {"enum": ["CPU", "GPU", "AUTO"]},
+    "output": {
+      "type": "object",
+      "required": ["width", "height", "fps"],
+      "properties": {
+        "width": {"type": "integer", "minimum": 320},
+        "height": {"type": "integer", "minimum": 240},
+        "fps": {"type": "integer", "minimum": 12, "maximum": 120}
+      },
+      "additionalProperties": false
+    },
+    "maximum_video_duration": {"type": "integer", "minimum": 1, "maximum": 86400},
+    "maximum_allowed_cost": {"type": "number", "minimum": 0, "maximum": 10},
+    "asset_library_paths": {"type": "array", "items": {"type": "string"}, "minItems": 1},
+    "characters": {"type": "object", "additionalProperties": {"type": "object"}},
+    "screenplay": {
+      "type": "object",
+      "properties": {
+        "analyzer": {"enum": ["auto", "ollama", "rules"]},
+        "ollama_endpoint": {"type": "string"},
+        "ollama_model": {"type": "string"}
+      },
+      "additionalProperties": true
+    },
+    "motion_fallbacks": {
+      "type": "object",
+      "additionalProperties": {"type": "array", "items": {"type": "string"}}
+    }
+  },
+  "additionalProperties": true
+}
+

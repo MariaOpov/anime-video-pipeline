@@ -1,0 +1,13 @@
+asset_id: ren_demo
+type: character
+file_path: demo_characters.blend
+creator: Anime Video Pipeline demo generator
+source: Procedurally generated locally
+character_type: humanoid
+compatible_skeleton: mmd_standard
+license:
+  name: CC0-1.0
+  commercial_use: true
+  modification: true
+  attribution_required: false
+

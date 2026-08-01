@@ -1,0 +1,37 @@
+project_name: "Phase 1 Demo Anime"
+script: script.txt
+preset: preview
+language: vi-VN
+subtitle_language: vi
+render_engine: BLENDER_EEVEE_NEXT
+render_device: AUTO
+output:
+  width: 1280
+  height: 720
+  fps: 24
+maximum_video_duration: 30
+maximum_allowed_cost: 0
+asset_library_paths:
+  - assets
+preferred_environment: school_rooftop
+music_volume: 0.20
+dialogue_volume: 1.0
+screenplay:
+  analyzer: rules
+  ollama_endpoint: http://127.0.0.1:11434
+  ollama_model: qwen2.5:3b
+characters:
+  Aiko:
+    model_id: aiko_demo
+    voice_id: vi_female_01
+    character_type: humanoid
+    skeleton: mmd_standard
+  Ren:
+    model_id: ren_demo
+    voice_id: vi_male_01
+    character_type: humanoid
+    skeleton: mmd_standard
+motion_fallbacks:
+  sad_talking: [idle_talking, idle]
+  surprised_talking: [surprised, idle_talking, idle]
+

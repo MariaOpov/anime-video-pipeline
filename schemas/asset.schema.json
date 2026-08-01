@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["asset_id", "type", "file_path", "creator", "source", "license"],
+  "properties": {
+    "asset_id": {"type": "string", "pattern": "^[a-zA-Z0-9_.-]+$"},
+    "type": {"enum": ["character", "motion", "environment", "prop", "music", "sound_effect"]},
+    "file_path": {"type": "string", "minLength": 1},
+    "creator": {"type": "string"},
+    "source": {"type": "string"},
+    "action": {"type": "string"},
+    "emotion": {"type": "string"},
+    "intensity": {"type": ["string", "number"]},
+    "duration": {"type": "number", "minimum": 0},
+    "looping": {"type": "boolean"},
+    "root_motion": {"type": "boolean"},
+    "required_props": {"type": "array", "items": {"type": "string"}},
+    "character_type": {"type": "string"},
+    "compatible_skeleton": {"type": "string"},
+    "license": {
+      "type": "object",
+      "required": ["name", "commercial_use", "modification", "attribution_required"],
+      "properties": {
+        "name": {"type": "string"},
+        "commercial_use": {"type": ["boolean", "null"]},
+        "modification": {"type": ["boolean", "null"]},
+        "attribution_required": {"type": ["boolean", "null"]}
+      },
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": true
+}
+

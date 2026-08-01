@@ -1,0 +1,14 @@
+[project]
+name = "anime-video-pipeline"
+version = "0.1.0"
+requires-python = ">=3.10"
+dependencies = [
+  "PyYAML>=6.0,<7",
+  "jsonschema>=4.21,<5",
+  "requests>=2.31,<3"
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+

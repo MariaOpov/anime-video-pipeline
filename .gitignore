@@ -1,0 +1,12 @@
+.venv/
+__pycache__/
+*.pyc
+projects/*/generated/*.json
+projects/*/logs/*.log
+projects/*/renders/
+projects/*/output/
+
+
+# Blender backup files
+*.blend1
+*.blend2

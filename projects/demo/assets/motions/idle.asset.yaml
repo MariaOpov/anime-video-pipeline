@@ -1,0 +1,20 @@
+asset_id: idle_mmd_standard_demo
+type: motion
+file_path: demo_motions.blend
+creator: Anime Video Pipeline demo generator
+source: Procedurally generated locally
+action: idle
+emotion: neutral
+intensity: low
+duration: 4.0
+looping: true
+root_motion: false
+required_props: []
+character_type: humanoid
+compatible_skeleton: mmd_standard
+license:
+  name: CC0-1.0
+  commercial_use: true
+  modification: true
+  attribution_required: false
+
