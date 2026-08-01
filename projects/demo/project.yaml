@@ -85,6 +85,9 @@ phase5:
 phase6:
   enabled: true
   max_script_characters: 100000
+  procedural_gestures:
+    enabled: true
+    amplitude_scale: 1.0
   ollama:
     endpoint: http://127.0.0.1:11434
     model: qwen2.5:3b

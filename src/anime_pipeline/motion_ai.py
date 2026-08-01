@@ -27,6 +27,28 @@ EMOTION_GESTURES = {
 CAMERA_TYPES = {"close_up", "medium", "wide", "full", "establishing"}
 
 
+def contextual_gestures(shot: dict[str, Any], character_name: str,
+                        emotion: str) -> list[str]:
+    """Add restrained dialogue/environment cues to the emotion defaults."""
+    gestures = list(EMOTION_GESTURES[emotion])
+    dialogue = " ".join(
+        str(line.get("text", ""))
+        for line in shot.get("dialogue", [])
+        if line.get("character") == character_name
+    ).casefold()
+    description = str(shot.get("description", "")).casefold()
+
+    if "?" in dialogue:
+        gestures.append("head_tilt")
+    elif re.search(r"\b(thật|đúng|vâng|ừ|được|yes|okay|ok)\b", dialogue):
+        gestures.append("nod")
+    if re.search(r"\b(xin lỗi|sorry|apolog)\w*\b", dialogue):
+        gestures.append("look_down")
+    if re.search(r"\b(wind|gió)\b", description):
+        gestures.append("wind_sway")
+    return list(dict.fromkeys(gestures))[:4]
+
+
 def normalize_action(value: str) -> str:
     normalized = re.sub(r"[^a-z0-9]+", "_", value.casefold()).strip("_")
     if len(normalized) < 2:
@@ -65,7 +87,7 @@ class RuleMotionPlanner:
                         "action": normalize_action(character.get("action", "idle")),
                         "emotion": emotion,
                         "intensity": EMOTION_INTENSITY[emotion],
-                        "gestures": EMOTION_GESTURES[emotion],
+                        "gestures": contextual_gestures(shot, character["name"], emotion),
                         "look_at": character.get("look_at"),
                         "confidence": 1.0,
                     })

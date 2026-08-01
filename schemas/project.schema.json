@@ -135,6 +135,14 @@
       "properties": {
         "enabled": {"type": "boolean"},
         "max_script_characters": {"type": "integer", "minimum": 1, "maximum": 1000000},
+        "procedural_gestures": {
+          "type": "object",
+          "properties": {
+            "enabled": {"type": "boolean"},
+            "amplitude_scale": {"type": "number", "minimum": 0.1, "maximum": 3.0}
+          },
+          "additionalProperties": false
+        },
         "ollama": {
           "type": "object",
           "required": ["endpoint", "model"],

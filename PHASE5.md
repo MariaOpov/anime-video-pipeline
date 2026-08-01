@@ -52,6 +52,8 @@ time remain in `generated/phase5_run_record.json` for diagnosis.
 - Every dialogue line has a non-empty WAV and a valid, identity-matched lip-sync file.
 - Timing warnings stay within the configured limit and mouth cues are non-empty.
 - Blender camera, audio-strip, and mouth-cue counts match the validated manifest.
+- Procedural performance clip and gesture counts match, pose keys are non-empty,
+  and no required bone alias is skipped.
 - The assembled scene and rendered Phase 3 preview exist.
 - The Phase 4 MP4, subtitle count, loudness flag, dimensions, duration, and size pass.
 - The final duration does not exceed `maximum_video_duration`.

@@ -16,12 +16,15 @@
 3. **Asset layer** — metadata index, licensing checks, compatibility search.
 4. **Animation plan** — motion selection and deterministic fallback chains.
 5. **Dialogue layer (Phase 2)** — Piper/recorded WAV, normalization, timing, Rhubarb cues.
-6. **Blender layer (Phase 3)** — validated manifest, shot cameras, audio strips, face animation.
+6. **Blender layer (Phase 3/6.1)** — validated manifest, shot cameras, audio
+   strips, face animation, and bounded procedural body performance.
 7. **Media layer (Phase 4)** — SRT generation, loudness normalization, final MP4 export.
 8. **Operations layer (Phase 5)** — one-command orchestration, logs, QA gates,
    atomic outputs, stage timing, dry-run, and resume.
 9. **Studio layer (Phase 6)** — local FastAPI UI, schema-constrained motion
    intent, allowlisted jobs, artifact preview, and quality visualization.
+10. **Gesture executor (Phase 6.1)** — semantic gesture clips, fixed bone aliases,
+    deterministic pose synthesis, and Blender keyframe insertion.
 
 ## Project directory contract
 
@@ -81,6 +84,14 @@ screenplay identity checks form a trust boundary before the deterministic
 motion selector sees the proposal. Job endpoints choose from fixed commands;
 they never accept a shell command from the browser.
 
+Phase 6.1 extends that trust boundary through Blender. The validated plan may
+name only an allowlisted semantic gesture. System Python converts each gesture
+to bounded Euler rotations for abstract aliases such as `head`, `spine`, and
+`arm.L`; Blender resolves those aliases against a fixed application-owned map.
+Neither Ollama nor edited JSON can specify a real bone name, rotation, data path,
+or keyframe. Phase 5 rejects a production if a required alias is missing or a
+performance clip creates no pose keys.
+
 ## Failure boundaries
 
 - Invalid configuration stops before any production output is written.
@@ -95,6 +106,8 @@ they never accept a shell command from the browser.
   malformed plan or changed shot/character identity is rejected.
 - Studio binds to loopback only and serves project paths through fixed
   document/artifact allowlists.
+- Unknown procedural gestures fail validation, generated rotations are clamped,
+  and unresolved bone aliases fail the final production gate.
 
 ## Security and licensing
 

@@ -17,7 +17,7 @@
     "run": {"type": "object"},
     "summary": {
       "type": "object",
-      "required": ["quality_gate_count", "passed_gate_count", "failed_gate_count", "scene_count", "shot_count", "unresolved_motion_count", "dialogue_count", "mouth_cue_count", "timing_warning_count", "duration_seconds", "output_size_bytes", "output_width", "output_height", "estimated_cost"],
+      "required": ["quality_gate_count", "passed_gate_count", "failed_gate_count", "scene_count", "shot_count", "unresolved_motion_count", "dialogue_count", "mouth_cue_count", "timing_warning_count", "performance_clip_count", "gesture_count", "pose_keyframe_count", "skipped_bone_alias_count", "duration_seconds", "output_size_bytes", "output_width", "output_height", "estimated_cost"],
       "properties": {
         "quality_gate_count": {"type": "integer", "minimum": 1},
         "passed_gate_count": {"type": "integer", "minimum": 0},
@@ -28,6 +28,10 @@
         "dialogue_count": {"type": "integer", "minimum": 0},
         "mouth_cue_count": {"type": "integer", "minimum": 0},
         "timing_warning_count": {"type": "integer", "minimum": 0},
+        "performance_clip_count": {"type": "integer", "minimum": 0},
+        "gesture_count": {"type": "integer", "minimum": 0},
+        "pose_keyframe_count": {"type": "integer", "minimum": 0},
+        "skipped_bone_alias_count": {"type": "integer", "minimum": 0},
         "duration_seconds": {"type": "number", "minimum": 0},
         "output_size_bytes": {"type": "integer", "minimum": 0},
         "output_width": {"type": "integer", "minimum": 0},

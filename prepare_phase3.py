@@ -30,7 +30,9 @@ def main() -> int:
     print(
         f"PHASE 3 MANIFEST READY — {summary['shot_count']} shot(s), "
         f"{summary['dialogue_count']} dialogue strip(s), "
-        f"{summary['mouth_cue_count']} mouth cue(s). Output: {output}"
+        f"{summary['mouth_cue_count']} mouth cue(s), "
+        f"{summary['performance_clip_count']} performance clip(s), "
+        f"{summary['gesture_count']} gesture(s). Output: {output}"
     )
     return 0
 

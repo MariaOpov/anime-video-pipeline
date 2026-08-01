@@ -1,0 +1,56 @@
+import sys
+import unittest
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+
+from anime_pipeline.gestures import build_pose_keyframes
+
+
+class GestureExecutorTests(unittest.TestCase):
+    def performance(self, **overrides):
+        payload = {
+            "start_frame": 1, "end_frame": 49, "action": "idle_talking",
+            "intensity": 0.4, "gestures": ["breathe"],
+        }
+        payload.update(overrides)
+        return payload
+
+    def test_talking_and_breathing_generate_smooth_bounded_pose_keys(self):
+        keys = build_pose_keyframes(self.performance())
+        self.assertEqual(keys[0]["frame"], 1)
+        self.assertEqual(keys[-1]["frame"], 49)
+        self.assertIn("spine", keys[2]["rotations"])
+        self.assertIn("arm.L", keys[2]["rotations"])
+        self.assertEqual(keys[0]["rotations"]["spine"], [0.0, 0.0, 0.0])
+        self.assertEqual(keys[-1]["rotations"]["arm.R"], [0.0, 0.0, 0.0])
+        self.assertLessEqual(
+            max(abs(value) for key in keys for rotation in key["rotations"].values()
+                for value in rotation), 0.65,
+        )
+
+    def test_look_down_and_nod_create_visible_head_pitch(self):
+        keys = build_pose_keyframes(self.performance(gestures=["look_down", "nod"]))
+        self.assertGreater(max(key["rotations"]["head"][0] for key in keys), 0.2)
+
+    def test_look_target_controls_head_yaw_direction(self):
+        right = build_pose_keyframes(self.performance(), look_direction=1.0)
+        left = build_pose_keyframes(self.performance(), look_direction=-1.0)
+        self.assertGreater(right[2]["rotations"]["head"][2], 0)
+        self.assertLess(left[2]["rotations"]["head"][2], 0)
+
+    def test_wind_sway_moves_spine_more_than_baseline(self):
+        baseline = build_pose_keyframes(self.performance(gestures=[]))
+        windy = build_pose_keyframes(self.performance(gestures=["wind_sway"]))
+        self.assertGreater(abs(windy[1]["rotations"]["spine"][1]),
+                           abs(baseline[1]["rotations"]["spine"][1]))
+
+    def test_rejects_unknown_gesture_and_invalid_frames(self):
+        with self.assertRaisesRegex(ValueError, "unsupported"):
+            build_pose_keyframes(self.performance(gestures=["execute_code"]))
+        with self.assertRaisesRegex(ValueError, "ordered"):
+            build_pose_keyframes(self.performance(start_frame=10, end_frame=5))
+
+
+if __name__ == "__main__":
+    unittest.main()

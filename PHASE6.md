@@ -4,7 +4,8 @@ Phase 6 adds a local browser-based production console without replacing the
 tested command-line pipeline. The Studio edits `script.txt`, generates a
 schema-constrained motion-intent contract, launches allowlisted pipeline jobs,
 shows incremental logs, previews the final MP4, and renders the Phase 5 release
-gates as a dashboard.
+gates as a dashboard. Phase 6.1 executes the validated gesture vocabulary in
+Blender; see `PHASE6_1.md` for its deterministic mapping and acceptance flow.
 
 ## Setup and launch
 
@@ -62,6 +63,12 @@ It cannot contain paths, shell commands, Python, Blender code, bone names, or
 raw keyframes. The deterministic motion selector remains the authority that
 maps an action tag to a compatible local asset and fallback chain.
 
+Phase 6.1 adds a second, equally strict boundary for body performance. The plan
+still carries semantic words only. Application code maps them to a fixed set of
+abstract bone aliases and bounded rotations; the Blender script resolves those
+aliases from an application-owned table. The plan cannot choose real bone
+names, data paths, numeric rotations, interpolation, or keyframes.
+
 If `script.txt` changes, the existing plan becomes stale. Phase 1 safely ignores
 that stale plan so it can regenerate the screenplay; the Studio then requires a
 new plan. A structurally invalid or identity-changing plan is rejected.
@@ -88,3 +95,7 @@ The same planner can be used from PowerShell after Phase 1:
 ```
 
 Replace `rules` with `ollama` when the configured local model is running.
+
+After generating or editing a plan, run Phase 1 once so its digest and semantic
+choices are recorded in `motion_plan.json`. The next Phase 3 build consumes that
+current plan and writes performance counts to `phase3_scene_report.json`.
