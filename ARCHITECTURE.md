@@ -29,6 +29,8 @@
     roles, gaze targets, deterministic blinks, emotional posture, and conflict audit.
 12. **Cinematic Blocking Director (Phase 6.3)** — stable stage positions, body
     facing, shot composition, bounded camera motion, and blocking risk audit.
+13. **Character onboarding (Phase 7)** — content-addressed PMX/PMD bundles,
+    normalized Blender caches, trusted bone/morph aliases, and asset readiness gates.
 
 ## Project directory contract
 
@@ -52,6 +54,8 @@ project/
 │   ├── motion_intent_plan.json
 │   ├── phase5_run_record.json
 │   └── production_report.json
+├── local_assets/                 # ignored; source bundles, profiles, registry
+├── blender_cache/                # ignored; normalized character .blend files
 ├── dialogue/
 ├── lip_sync/
 ├── subtitles/
@@ -109,6 +113,13 @@ templates, then audits framing, clearance, screen order, and placement overlap.
 Blender inserts only those validated transforms and reports the actual placement
 and camera key counts. No AI-produced coordinate reaches the scene.
 
+Phase 7 establishes a local asset trust boundary before Phase 3. The importer
+copies the full source bundle into a content-addressed project directory,
+imports it through `mmd_tools`, normalizes its collection/root transform, packs
+available images, and writes a schema-validated profile. Phase 3 sees only an
+activated profile with project-relative paths and application-owned aliases;
+the original PMX and textures are never read directly during normal production.
+
 ## Failure boundaries
 
 - Invalid configuration stops before any production output is written.
@@ -129,6 +140,8 @@ and camera key counts. No AI-produced coordinate reaches the scene.
   Performance Director release gate.
 - Missing placement/camera keys or any blocking, continuity, framing, or camera
   clearance risk fails the Cinematic Blocking release gate.
+- Missing character cache, required rig/mouth/blink aliases, or required texture
+  and license metadata prevents Phase 7 activation and fails the release gate.
 
 ## Security and licensing
 

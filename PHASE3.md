@@ -8,6 +8,7 @@ It does not overwrite the original mannequin or imported character asset.
 ```text
 shot_list.json + dialogue_timeline.json + lip_sync/*.json
                  + current motion_intent_plan.json
+                 + activated Phase 7 character profiles
                             |
                             v
                   phase3_manifest.json
@@ -51,9 +52,11 @@ falls back to the older `file_format = FFMPEG` API when necessary.
 - A current validated motion-intent plan becomes bounded head, spine, arm, and
   leg pose keys; without one, assembly retains the Phase 3-only behavior.
 - A small fallback mouth mesh is created for each demo mannequin.
+- An activated Phase 7 cache replaces only its matching mannequin and supplies
+  mapped real rig, mouth, and blink targets.
 
-The fallback is intentionally simple. Real PMX/MMD characters should map the
-Phase 2 cue names to their actual mouth morph names in `project.yaml`.
+The fallback is intentionally simple. Phase 7 resolves real PMX/MMD mouth
+morphs and records them in the validated character profile.
 
 ## Acceptance criteria
 

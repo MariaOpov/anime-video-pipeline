@@ -1,9 +1,9 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "type": "object",
-  "required": ["version", "project_name", "fps", "frame_start", "frame_end", "base_scene", "output_scene", "preview_video", "render", "camera", "performance", "blocking", "shots", "dialogue", "summary"],
+  "required": ["version", "project_name", "fps", "frame_start", "frame_end", "base_scene", "output_scene", "preview_video", "render", "camera", "performance", "blocking", "character_assets", "shots", "dialogue", "summary"],
   "properties": {
-    "version": {"const": 4},
+    "version": {"const": 5},
     "project_name": {"type": "string", "minLength": 1},
     "fps": {"type": "integer", "minimum": 1},
     "frame_start": {"type": "integer", "minimum": 1},
@@ -165,6 +165,50 @@
       },
       "additionalProperties": false
     },
+    "character_assets": {
+      "type": "object",
+      "required": ["enabled", "characters", "configured_count", "ready_count", "missing_texture_count", "warning_count", "license_warning_count"],
+      "properties": {
+        "enabled": {"type": "boolean"},
+        "characters": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["character", "profile", "cache_blend", "cache_collection", "armature_object", "model_sha256", "bone_mapping", "morph_mapping", "required_bone_count", "resolved_bone_count", "bone_coverage", "required_mouth_morph_count", "resolved_mouth_morph_count", "mouth_morph_coverage", "blink_morph_resolved", "texture_count", "missing_texture_count", "license_name", "license_warning", "warnings", "ready"],
+            "properties": {
+              "character": {"type": "string", "minLength": 1},
+              "profile": {"type": "string", "minLength": 1},
+              "cache_blend": {"type": "string", "minLength": 1},
+              "cache_collection": {"type": "string", "minLength": 1},
+              "armature_object": {"type": "string", "minLength": 1},
+              "model_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+              "bone_mapping": {"type": "object", "additionalProperties": {"type": ["string", "null"]}},
+              "morph_mapping": {"type": "object", "additionalProperties": {"type": ["string", "null"]}},
+              "required_bone_count": {"type": "integer", "minimum": 1},
+              "resolved_bone_count": {"type": "integer", "minimum": 0},
+              "bone_coverage": {"type": "number", "minimum": 0, "maximum": 1},
+              "required_mouth_morph_count": {"type": "integer", "minimum": 1},
+              "resolved_mouth_morph_count": {"type": "integer", "minimum": 0},
+              "mouth_morph_coverage": {"type": "number", "minimum": 0, "maximum": 1},
+              "blink_morph_resolved": {"type": "boolean"},
+              "texture_count": {"type": "integer", "minimum": 0},
+              "missing_texture_count": {"type": "integer", "minimum": 0},
+              "license_name": {"type": "string"},
+              "license_warning": {"type": "boolean"},
+              "warnings": {"type": "array", "items": {"type": "string"}},
+              "ready": {"type": "boolean"}
+            },
+            "additionalProperties": false
+          }
+        },
+        "configured_count": {"type": "integer", "minimum": 0},
+        "ready_count": {"type": "integer", "minimum": 0},
+        "missing_texture_count": {"type": "integer", "minimum": 0},
+        "warning_count": {"type": "integer", "minimum": 0},
+        "license_warning_count": {"type": "integer", "minimum": 0}
+      },
+      "additionalProperties": false
+    },
     "shots": {
       "type": "array", "minItems": 1,
       "items": {
@@ -194,7 +238,7 @@
       }
     },
     "summary": {
-      "type": "object", "required": ["shot_count", "dialogue_count", "mouth_cue_count", "performance_clip_count", "gesture_count", "dialogue_beat_count", "gaze_target_count", "blink_event_count", "listener_reaction_count", "performance_conflict_count", "blocking_shot_count", "character_placement_count", "body_facing_count", "camera_motion_count", "framing_risk_count", "camera_collision_risk_count", "continuity_violation_count", "blocking_conflict_count"],
+      "type": "object", "required": ["shot_count", "dialogue_count", "mouth_cue_count", "performance_clip_count", "gesture_count", "dialogue_beat_count", "gaze_target_count", "blink_event_count", "listener_reaction_count", "performance_conflict_count", "blocking_shot_count", "character_placement_count", "body_facing_count", "camera_motion_count", "framing_risk_count", "camera_collision_risk_count", "continuity_violation_count", "blocking_conflict_count", "production_character_count", "character_asset_ready_count", "character_texture_missing_count", "character_asset_warning_count", "character_license_warning_count"],
       "properties": {
         "shot_count": {"type": "integer", "minimum": 1},
         "dialogue_count": {"type": "integer", "minimum": 0},
@@ -213,7 +257,12 @@
         "framing_risk_count": {"type": "integer", "minimum": 0},
         "camera_collision_risk_count": {"type": "integer", "minimum": 0},
         "continuity_violation_count": {"type": "integer", "minimum": 0},
-        "blocking_conflict_count": {"type": "integer", "minimum": 0}
+        "blocking_conflict_count": {"type": "integer", "minimum": 0},
+        "production_character_count": {"type": "integer", "minimum": 0},
+        "character_asset_ready_count": {"type": "integer", "minimum": 0},
+        "character_texture_missing_count": {"type": "integer", "minimum": 0},
+        "character_asset_warning_count": {"type": "integer", "minimum": 0},
+        "character_license_warning_count": {"type": "integer", "minimum": 0}
       }, "additionalProperties": false
     }
   },

@@ -32,7 +32,11 @@ const elements = {
   metricGesturesDetail: document.querySelector("#metric-gestures-detail"),
   metricCamera: document.querySelector("#metric-camera"),
   metricCameraDetail: document.querySelector("#metric-camera-detail"),
+  metricModels: document.querySelector("#metric-models"),
+  metricModelsDetail: document.querySelector("#metric-models-detail"),
   metricCost: document.querySelector("#metric-cost"),
+  characterSummary: document.querySelector("#character-summary"),
+  characterAssets: document.querySelector("#character-assets"),
   directionSummary: document.querySelector("#direction-summary"),
   directionTimeline: document.querySelector("#direction-timeline"),
   blockingSummary: document.querySelector("#blocking-summary"),
@@ -111,6 +115,8 @@ function renderReport(report) {
     elements.metricGesturesDetail.textContent = "Procedural performance";
     elements.metricCamera.textContent = "—";
     elements.metricCameraDetail.textContent = "Cinematic blocking";
+    elements.metricModels.textContent = "—";
+    elements.metricModelsDetail.textContent = "Production characters";
     setChip(elements.qualityChip, "No report", "muted");
     elements.qualityList.replaceChildren();
     const empty = document.createElement("p");
@@ -127,6 +133,8 @@ function renderReport(report) {
   elements.metricGesturesDetail.textContent = `${summary.pose_keyframe_count ?? 0} pose · ${summary.blink_event_count ?? 0} blink`;
   elements.metricCamera.textContent = summary.camera_motion_count ?? 0;
   elements.metricCameraDetail.textContent = `${summary.character_placement_count ?? 0} placements · ${summary.camera_keyframe_count ?? 0} keys`;
+  elements.metricModels.textContent = `${summary.production_character_loaded_count ?? 0}/${summary.production_character_count ?? 0}`;
+  elements.metricModelsDetail.textContent = `${summary.resolved_character_bone_alias_count ?? 0} bones · ${summary.resolved_character_mouth_morph_count ?? 0} morphs`;
   elements.metricCost.textContent = `$${summary.estimated_cost}`;
   setChip(elements.qualityChip, report.status.toUpperCase(), report.status === "complete" ? "ok" : "danger");
   elements.qualityList.replaceChildren();
@@ -143,6 +151,52 @@ function renderReport(report) {
     copy.append(title, detail);
     item.append(dot, copy);
     elements.qualityList.append(item);
+  });
+}
+
+function renderCharacterAssets(manifest) {
+  const contract = manifest?.character_assets;
+  elements.characterAssets.replaceChildren();
+  if (!contract?.characters?.length) {
+    elements.characterSummary.textContent = "Chưa kích hoạt model";
+    const empty = document.createElement("p");
+    empty.className = "empty-copy";
+    empty.textContent = "Chạy Phase 7 để kiểm tra và kích hoạt model PMX/PMD cục bộ.";
+    elements.characterAssets.append(empty);
+    return;
+  }
+  elements.characterSummary.textContent =
+    `${contract.ready_count}/${contract.configured_count} ready · ` +
+    `${contract.missing_texture_count} missing texture · ${contract.warning_count} warning`;
+  elements.characterSummary.classList.toggle("danger", contract.ready_count !== contract.configured_count);
+  contract.characters.forEach(asset => {
+    const card = document.createElement("article");
+    card.className = `character-asset ${asset.ready ? "ready" : "failed"}`;
+    const head = document.createElement("div");
+    head.className = "character-asset-head";
+    const name = document.createElement("strong");
+    name.textContent = asset.character;
+    const state = document.createElement("span");
+    state.className = `chip ${asset.ready ? "" : "chip-danger"}`;
+    state.textContent = asset.ready ? "READY" : "BLOCKED";
+    head.append(name, state);
+    const details = document.createElement("dl");
+    const rows = [
+      ["Required bones", `${asset.resolved_bone_count}/${asset.required_bone_count}`],
+      ["Mouth morphs", `${asset.resolved_mouth_morph_count}/${asset.required_mouth_morph_count}`],
+      ["Blink", asset.blink_morph_resolved ? "mapped" : "missing"],
+      ["Textures", `${asset.texture_count} / ${asset.missing_texture_count} missing`],
+      ["License", asset.license_name || "Unknown"],
+    ];
+    rows.forEach(([label, value]) => {
+      const term = document.createElement("dt");
+      const definition = document.createElement("dd");
+      term.textContent = label;
+      definition.textContent = value;
+      details.append(term, definition);
+    });
+    card.append(head, details);
+    elements.characterAssets.append(card);
   });
 }
 
@@ -281,6 +335,7 @@ async function loadStatus() {
     elements.scriptState.textContent = "Đã đồng bộ";
     renderMotion(motion);
     renderReport(report);
+    renderCharacterAssets(manifest);
     renderDirection(manifest, report);
     renderBlocking(manifest, report);
     refreshVideo(status.artifacts.final_video);

@@ -100,6 +100,18 @@ phase6:
     endpoint: http://127.0.0.1:11434
     model: qwen2.5:3b
     timeout_seconds: 180
+phase7:
+  enabled: true
+  registry: local_assets/character_registry.json
+  local_asset_dir: local_assets/characters
+  cache_dir: blender_cache/characters
+  target_height_meters: 1.72
+  rotation_z_degrees: 0.0
+  minimum_bone_alias_coverage: 1.0
+  minimum_mouth_morph_coverage: 1.0
+  require_blink_morph: true
+  require_complete_textures: true
+  require_license_metadata: false
 characters:
   Aiko:
     model_id: aiko_demo

@@ -1,4 +1,4 @@
-# Anime Video Pipeline — Phase 6.3
+# Anime Video Pipeline — Phase 7
 
 A Windows-first foundation for an offline, reusable anime production pipeline.
 Phase 1 turns a text script into validated screenplay and shot-list JSON, indexes
@@ -17,6 +17,10 @@ Phase 6.2 directs those poses around dialogue beats, inferred gaze, deterministi
 blinks, emotional posture, and subtle listener reactions. Phase 6.3 adds stable
 character staging, body facing, shot composition, bounded camera moves, and a
 blocking safety audit.
+Phase 7 onboards real PMX/PMD characters through a guarded local import,
+normalizes and caches them, maps trusted rig and facial aliases, and blocks
+production when model, texture, morph, or license checks do not satisfy the
+project policy.
 
 ## Architecture
 
@@ -53,6 +57,9 @@ screenplay.json + dialogue_timeline.json + lip_sync/*.json
           |
           v
 Phase 3 manifest ----------> Blender blocking/cameras + WAV + mouth/pose keys
+          ^
+          |
+ Phase 7 local PMX --------> inspected rig/morph/texture cache
           |
           v
 Phase 3 preview -----------> SRT + loudness normalization + final MP4
@@ -133,6 +140,21 @@ The Studio opens on `http://127.0.0.1:8000` and provides a script editor,
 schema-validated motion JSON editor, Ollama/rules generation, allowlisted
 pipeline controls, incremental logs, final-video playback, and all release
 gates. It is loopback-only and does not expose remote command execution.
+
+Onboard one local PMX/PMD character before the next production build:
+
+```powershell
+.\run_phase7.ps1 `
+  -Character Aiko `
+  -Model "D:\Models\Flavia\芙拉薇娅.pmx" `
+  -Creator "Unknown" `
+  -Source "Unknown" `
+  -LicenseName "Unknown"
+```
+
+The original model folder, staged bundle, profile, registry, and Blender cache
+stay local and are excluded from Git. See `PHASE7.md` before publishing any
+model-derived output or redistributing assets.
 
 Optional local LLM:
 
@@ -241,11 +263,24 @@ toward validated look targets, selects a deterministic composition per shot,
 and inserts subtle camera transform keys. The four-shot demo uses a two-shot,
 a close-up, and over-shoulder framing while preserving Aiko/Ren screen order.
 
-The manifest is version 4 and carries placement, body-facing, lens, camera
+The manifest carries placement, body-facing, lens, camera
 movement, and pre-Blender risk metrics. Blender reports the transforms it
 actually keyed. Phase 5 rejects missing keys or any framing, collision,
 continuity, or placement risk, raising the complete demo audit to 30 gates.
 See `PHASE6_3.md`.
+
+## Phase 7 Production Character Onboarding
+
+Phase 7 imports one PMX/PMD bundle through `mmd_tools`, preserves the complete
+texture directory, scales and grounds the model, resolves application-owned rig
+and facial aliases, packs available images, and saves a character-only Blender
+cache. Its validated profile becomes a local registry entry; Phase 3 then
+replaces only the matching mannequin.
+
+The manifest is version 5 and records only safe project-relative cache/profile
+contracts plus coverage metrics. Phase 5 requires every configured production
+character to load with matching bone, mouth, texture, and license counts,
+raising the complete demo audit to 31 gates. See `PHASE7.md`.
 
 ## Asset metadata
 
@@ -270,5 +305,5 @@ production outputs. Use `--verbose` for console debug messages.
 ## Possible extensions
 
 1. Optional ComfyUI backgrounds and image-to-video inserts.
-2. Import, normalize, and retarget a production MMD character/motion library.
+2. Retarget and curate a production VMD motion library for onboarded rigs.
 3. Environment-aware blocking, occlusion checks, and model-specific cloth/hair wind.

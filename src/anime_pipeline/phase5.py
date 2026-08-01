@@ -38,6 +38,12 @@ class Phase5Auditor:
             "camera_motion_count": 0, "camera_keyframe_count": 0,
             "framing_risk_count": 0, "camera_collision_risk_count": 0,
             "continuity_violation_count": 0, "blocking_conflict_count": 0,
+            "production_character_count": 0, "production_character_loaded_count": 0,
+            "resolved_character_bone_alias_count": 0,
+            "resolved_character_mouth_morph_count": 0,
+            "character_texture_missing_count": 0,
+            "character_asset_warning_count": 0,
+            "character_license_warning_count": 0,
             "duration_seconds": 0, "output_size_bytes": 0, "output_width": 0,
             "output_height": 0, "estimated_cost": 0,
         }
@@ -185,6 +191,10 @@ class Phase5Auditor:
             and int(scene_report.get("camera_collision_risk_count", -1)) == int(summary["camera_collision_risk_count"])
             and int(scene_report.get("continuity_violation_count", -1)) == int(summary["continuity_violation_count"])
             and int(scene_report.get("blocking_conflict_count", -1)) == int(summary["blocking_conflict_count"])
+            and int(scene_report.get("production_character_count", -1)) == int(summary["production_character_count"])
+            and int(scene_report.get("production_character_loaded_count", -1)) == int(summary["character_asset_ready_count"])
+            and int(scene_report.get("character_texture_missing_count", -1)) == int(summary["character_texture_missing_count"])
+            and int(scene_report.get("character_license_warning_count", -1)) == int(summary["character_license_warning_count"])
         )
         self._gate(3, "blender_assembly_counts_match", counts_match, summary, {
             "shot_count": scene_report.get("camera_count"),
@@ -205,6 +215,10 @@ class Phase5Auditor:
             "camera_collision_risk_count": scene_report.get("camera_collision_risk_count"),
             "continuity_violation_count": scene_report.get("continuity_violation_count"),
             "blocking_conflict_count": scene_report.get("blocking_conflict_count"),
+            "production_character_count": scene_report.get("production_character_count"),
+            "production_character_loaded_count": scene_report.get("production_character_loaded_count"),
+            "character_texture_missing_count": scene_report.get("character_texture_missing_count"),
+            "character_license_warning_count": scene_report.get("character_license_warning_count"),
         })
         expected_clips = int(summary["performance_clip_count"])
         pose_keyframes = int(scene_report.get("pose_keyframe_count", 0))
@@ -279,6 +293,37 @@ class Phase5Auditor:
                        "continuity_violations": scene_report.get("continuity_violation_count"),
                        "blocking_conflicts": scene_report.get("blocking_conflict_count"),
                    })
+        character_contract = manifest.get("character_assets", {})
+        expected_characters = int(summary["production_character_count"])
+        expected_ready = int(summary["character_asset_ready_count"])
+        loaded_characters = int(scene_report.get("production_character_loaded_count", 0))
+        resolved_character_bones = int(scene_report.get("resolved_character_bone_alias_count", 0))
+        resolved_character_mouth = int(scene_report.get("resolved_character_mouth_morph_count", 0))
+        expected_bones = sum(int(item["resolved_bone_count"])
+                             for item in character_contract.get("characters", []))
+        expected_mouth = sum(int(item["resolved_mouth_morph_count"])
+                             for item in character_contract.get("characters", []))
+        assets_ok = (
+            expected_ready == expected_characters
+            and loaded_characters == expected_characters
+            and int(scene_report.get("production_character_count", -1)) == expected_characters
+            and resolved_character_bones == expected_bones
+            and resolved_character_mouth == expected_mouth
+            and int(scene_report.get("character_texture_missing_count", -1))
+                == int(summary["character_texture_missing_count"])
+            and int(scene_report.get("character_license_warning_count", -1))
+                == int(summary["character_license_warning_count"])
+        )
+        self._gate(3, "production_character_assets_ready", assets_ok,
+                   "all configured production characters loaded with validated rig, morph, texture, and license status", {
+                       "configured": expected_characters,
+                       "ready": expected_ready,
+                       "loaded": loaded_characters,
+                       "resolved_bones": resolved_character_bones,
+                       "resolved_mouth_morphs": resolved_character_mouth,
+                       "missing_textures": scene_report.get("character_texture_missing_count"),
+                       "license_warnings": scene_report.get("character_license_warning_count"),
+                   })
         scene_path = self._resolve_project_relative(scene_report.get("scene_file", ""))
         preview_path = self._resolve_project_relative(scene_report.get("preview_video", ""))
         artifacts_exist = scene_path.is_file() and preview_path.is_file() and preview_path.stat().st_size > 0
@@ -311,6 +356,13 @@ class Phase5Auditor:
             "camera_collision_risk_count": int(scene_report.get("camera_collision_risk_count", 0)),
             "continuity_violation_count": int(scene_report.get("continuity_violation_count", 0)),
             "blocking_conflict_count": int(scene_report.get("blocking_conflict_count", 0)),
+            "production_character_count": expected_characters,
+            "production_character_loaded_count": loaded_characters,
+            "resolved_character_bone_alias_count": resolved_character_bones,
+            "resolved_character_mouth_morph_count": resolved_character_mouth,
+            "character_texture_missing_count": int(scene_report.get("character_texture_missing_count", 0)),
+            "character_asset_warning_count": int(summary["character_asset_warning_count"]),
+            "character_license_warning_count": int(scene_report.get("character_license_warning_count", 0)),
         })
         return manifest
 

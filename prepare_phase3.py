@@ -40,7 +40,9 @@ def main() -> int:
         f"{summary['blocking_shot_count']} blocking shot(s), "
         f"{summary['character_placement_count']} placement(s), "
         f"{summary['camera_motion_count']} camera move(s), "
-        f"{summary['framing_risk_count']} framing risk(s). Output: {output}"
+        f"{summary['framing_risk_count']} framing risk(s), "
+        f"{summary['character_asset_ready_count']}/{summary['production_character_count']} "
+        f"production character(s) ready. Output: {output}"
     )
     return 0
 

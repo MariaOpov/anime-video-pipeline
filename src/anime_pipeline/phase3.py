@@ -6,6 +6,7 @@ import math
 from pathlib import Path
 from typing import Any
 
+from .character_assets import build_character_contract
 from .cinematography import direct_cinematography
 from .config import ProjectConfig
 from .direction import direct_performance
@@ -72,6 +73,11 @@ class Phase3Planner:
 
         performance = self._build_performance(shots, timeline)
         blocking = self._build_blocking(shots, performance)
+        character_assets = build_character_contract(
+            self.config.project_dir,
+            self.config.data.get("phase7", {}),
+            self.schemas,
+        )
 
         dialogue = []
         cue_total = 0
@@ -105,7 +111,7 @@ class Phase3Planner:
                             float(timeline.get("total_duration_seconds", 0)))
         output = self.config.data["output"]
         manifest = {
-            "version": 4, "project_name": self.config.data["project_name"],
+            "version": 5, "project_name": self.config.data["project_name"],
             "fps": self.config.fps, "frame_start": 1,
             "frame_end": max(1, math.ceil(total_seconds * self.config.fps)),
             "base_scene": base_scene.relative_to(self.config.project_dir).as_posix(),
@@ -117,7 +123,7 @@ class Phase3Planner:
                 "resolution_percentage": int(self.settings.get("resolution_percentage", 100)),
             },
             "camera": self.settings.get("camera", {}), "performance": performance,
-            "blocking": blocking,
+            "blocking": blocking, "character_assets": character_assets,
             "shots": shots, "dialogue": dialogue,
             "summary": {"shot_count": len(shots), "dialogue_count": len(dialogue),
                         "mouth_cue_count": cue_total,
@@ -137,7 +143,12 @@ class Phase3Planner:
                         "framing_risk_count": blocking["framing_risk_count"],
                         "camera_collision_risk_count": blocking["camera_collision_risk_count"],
                         "continuity_violation_count": blocking["continuity_violation_count"],
-                        "blocking_conflict_count": blocking["blocking_conflict_count"]},
+                        "blocking_conflict_count": blocking["blocking_conflict_count"],
+                        "production_character_count": character_assets["configured_count"],
+                        "character_asset_ready_count": character_assets["ready_count"],
+                        "character_texture_missing_count": character_assets["missing_texture_count"],
+                        "character_asset_warning_count": character_assets["warning_count"],
+                        "character_license_warning_count": character_assets["license_warning_count"]},
         }
         validate(manifest, self.schemas / "phase3_manifest.schema.json", "Phase 3 manifest")
         return manifest

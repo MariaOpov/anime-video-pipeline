@@ -25,7 +25,7 @@ class Phase3Tests(unittest.TestCase):
             self._write_fixture(project)
             manifest = Phase3Planner(self._config(project), self.schemas).build()
             self.assertEqual(manifest["frame_end"], 48)
-            self.assertEqual(manifest["version"], 4)
+            self.assertEqual(manifest["version"], 5)
             self.assertEqual(manifest["summary"], {
                 "shot_count": 1, "dialogue_count": 1, "mouth_cue_count": 2,
                 "performance_clip_count": 0, "gesture_count": 0,
@@ -36,7 +36,12 @@ class Phase3Tests(unittest.TestCase):
                 "body_facing_count": 0, "camera_motion_count": 0,
                 "framing_risk_count": 0, "camera_collision_risk_count": 0,
                 "continuity_violation_count": 0, "blocking_conflict_count": 0,
+                "production_character_count": 0, "character_asset_ready_count": 0,
+                "character_texture_missing_count": 0,
+                "character_asset_warning_count": 0,
+                "character_license_warning_count": 0,
             })
+            self.assertEqual(manifest["character_assets"]["characters"], [])
             self.assertEqual(manifest["dialogue"][0]["mouth_cues"][1]["mouth_shape"], "A")
 
     def test_carries_validated_motion_intent_into_performance_clips(self):
