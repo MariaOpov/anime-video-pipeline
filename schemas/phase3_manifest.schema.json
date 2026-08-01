@@ -3,7 +3,7 @@
   "type": "object",
   "required": ["version", "project_name", "fps", "frame_start", "frame_end", "base_scene", "output_scene", "preview_video", "render", "camera", "performance", "shots", "dialogue", "summary"],
   "properties": {
-    "version": {"const": 2},
+    "version": {"const": 3},
     "project_name": {"type": "string", "minLength": 1},
     "fps": {"type": "integer", "minimum": 1},
     "frame_start": {"type": "integer", "minimum": 1},
@@ -22,7 +22,7 @@
     "camera": {"type": "object"},
     "performance": {
       "type": "object",
-      "required": ["enabled", "source", "amplitude_scale", "clips"],
+      "required": ["enabled", "source", "amplitude_scale", "clips", "gaze_events", "blink_events", "dialogue_beat_count", "listener_reaction_count", "performance_conflict_count"],
       "properties": {
         "enabled": {"type": "boolean"},
         "source": {"enum": [null, "rules", "ollama", "manual"]},
@@ -31,11 +31,12 @@
           "type": "array",
           "items": {
             "type": "object",
-            "required": ["scene_id", "shot_id", "character", "start_frame", "end_frame", "action", "emotion", "intensity", "gestures", "look_at"],
+            "required": ["scene_id", "shot_id", "character", "role", "start_frame", "end_frame", "action", "emotion", "intensity", "gestures", "look_at", "beats"],
             "properties": {
               "scene_id": {"type": "string", "minLength": 1},
               "shot_id": {"type": "string", "minLength": 1},
               "character": {"type": "string", "minLength": 1},
+              "role": {"enum": ["speaker", "listener", "performer"]},
               "start_frame": {"type": "integer", "minimum": 1},
               "end_frame": {"type": "integer", "minimum": 1},
               "action": {"type": "string", "pattern": "^[a-z][a-z0-9_]{1,63}$"},
@@ -45,11 +46,56 @@
                 "type": "array", "maxItems": 4, "uniqueItems": true,
                 "items": {"enum": ["look_down", "look_up", "head_tilt", "nod", "shake_head", "small_hand_motion", "open_hand", "point", "step_forward", "step_back", "turn_left", "turn_right", "breathe", "wind_sway"]}
               },
-              "look_at": {"type": ["string", "null"]}
+              "look_at": {"type": ["string", "null"]},
+              "beats": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": ["type", "gesture", "start_frame", "peak_frame", "end_frame"],
+                  "properties": {
+                    "type": {"enum": ["speech", "gesture", "listener_reaction"]},
+                    "gesture": {"enum": [null, "look_down", "look_up", "head_tilt", "nod", "shake_head", "small_hand_motion", "open_hand", "point", "step_forward", "step_back", "turn_left", "turn_right", "breathe", "wind_sway"]},
+                    "start_frame": {"type": "integer", "minimum": 1},
+                    "peak_frame": {"type": "integer", "minimum": 1},
+                    "end_frame": {"type": "integer", "minimum": 1}
+                  },
+                  "additionalProperties": false
+                }
+              }
             },
             "additionalProperties": false
           }
-        }
+        },
+        "gaze_events": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["scene_id", "shot_id", "character", "target", "start_frame", "end_frame"],
+            "properties": {
+              "scene_id": {"type": "string"}, "shot_id": {"type": "string"},
+              "character": {"type": "string"}, "target": {"type": "string"},
+              "start_frame": {"type": "integer", "minimum": 1},
+              "end_frame": {"type": "integer", "minimum": 1}
+            },
+            "additionalProperties": false
+          }
+        },
+        "blink_events": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["character", "close_frame", "open_frame"],
+            "properties": {
+              "character": {"type": "string"},
+              "close_frame": {"type": "integer", "minimum": 1},
+              "open_frame": {"type": "integer", "minimum": 1}
+            },
+            "additionalProperties": false
+          }
+        },
+        "dialogue_beat_count": {"type": "integer", "minimum": 0},
+        "listener_reaction_count": {"type": "integer", "minimum": 0},
+        "performance_conflict_count": {"type": "integer", "minimum": 0}
       },
       "additionalProperties": false
     },
@@ -82,13 +128,18 @@
       }
     },
     "summary": {
-      "type": "object", "required": ["shot_count", "dialogue_count", "mouth_cue_count", "performance_clip_count", "gesture_count"],
+      "type": "object", "required": ["shot_count", "dialogue_count", "mouth_cue_count", "performance_clip_count", "gesture_count", "dialogue_beat_count", "gaze_target_count", "blink_event_count", "listener_reaction_count", "performance_conflict_count"],
       "properties": {
         "shot_count": {"type": "integer", "minimum": 1},
         "dialogue_count": {"type": "integer", "minimum": 0},
         "mouth_cue_count": {"type": "integer", "minimum": 0},
         "performance_clip_count": {"type": "integer", "minimum": 0},
-        "gesture_count": {"type": "integer", "minimum": 0}
+        "gesture_count": {"type": "integer", "minimum": 0},
+        "dialogue_beat_count": {"type": "integer", "minimum": 0},
+        "gaze_target_count": {"type": "integer", "minimum": 0},
+        "blink_event_count": {"type": "integer", "minimum": 0},
+        "listener_reaction_count": {"type": "integer", "minimum": 0},
+        "performance_conflict_count": {"type": "integer", "minimum": 0}
       }, "additionalProperties": false
     }
   },

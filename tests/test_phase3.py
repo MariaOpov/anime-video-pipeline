@@ -25,10 +25,13 @@ class Phase3Tests(unittest.TestCase):
             self._write_fixture(project)
             manifest = Phase3Planner(self._config(project), self.schemas).build()
             self.assertEqual(manifest["frame_end"], 48)
-            self.assertEqual(manifest["version"], 2)
+            self.assertEqual(manifest["version"], 3)
             self.assertEqual(manifest["summary"], {
                 "shot_count": 1, "dialogue_count": 1, "mouth_cue_count": 2,
                 "performance_clip_count": 0, "gesture_count": 0,
+                "dialogue_beat_count": 0, "gaze_target_count": 0,
+                "blink_event_count": 0, "listener_reaction_count": 0,
+                "performance_conflict_count": 0,
             })
             self.assertEqual(manifest["dialogue"][0]["mouth_cues"][1]["mouth_shape"], "A")
 
@@ -41,6 +44,9 @@ class Phase3Tests(unittest.TestCase):
             self.assertEqual(manifest["summary"]["performance_clip_count"], 1)
             self.assertEqual(manifest["performance"]["clips"][0]["character"], "Aiko")
             self.assertIn("breathe", manifest["performance"]["clips"][0]["gestures"])
+            self.assertEqual(manifest["performance"]["clips"][0]["role"], "speaker")
+            self.assertEqual(manifest["summary"]["dialogue_beat_count"], 1)
+            self.assertEqual(manifest["summary"]["performance_conflict_count"], 0)
 
     def test_rejects_lip_sync_identity_mismatch(self):
         with tempfile.TemporaryDirectory() as directory:

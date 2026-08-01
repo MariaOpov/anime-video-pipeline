@@ -76,19 +76,27 @@ class RuleMotionPlanner:
     def build(self, project_name: str, screenplay: dict[str, Any]) -> dict[str, Any]:
         shots = []
         for scene in screenplay["scenes"]:
+            scene_cast: list[str] = []
+            for scene_shot in scene["shots"]:
+                for cast_member in scene_shot["characters"]:
+                    if cast_member["name"] not in scene_cast:
+                        scene_cast.append(cast_member["name"])
             for shot in scene["shots"]:
                 characters = []
                 for character in shot["characters"]:
                     emotion = character.get("emotion", "neutral")
                     if emotion not in EMOTION_INTENSITY:
                         emotion = "neutral"
+                    look_at = character.get("look_at") or next(
+                        (name for name in scene_cast if name != character["name"]), None
+                    )
                     characters.append({
                         "name": character["name"],
                         "action": normalize_action(character.get("action", "idle")),
                         "emotion": emotion,
                         "intensity": EMOTION_INTENSITY[emotion],
                         "gestures": contextual_gestures(shot, character["name"], emotion),
-                        "look_at": character.get("look_at"),
+                        "look_at": look_at,
                         "confidence": 1.0,
                     })
                 camera = shot.get("camera", {}).get("shot_type", "medium")

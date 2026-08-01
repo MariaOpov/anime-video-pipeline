@@ -238,6 +238,23 @@ select:focus { border-color: var(--cyan); }
 .metric strong { display: block; margin: 7px 0 4px; font-size: 25px; letter-spacing: -0.04em; }
 .metric small { font-size: 10px; }
 
+.direction-card { padding: 18px; }
+.direction-summary { color: var(--muted); font-size: 11px; }
+.direction-summary.danger { color: var(--red); }
+.direction-timeline { display: grid; gap: 7px; }
+.timeline-row { min-width: 0; display: grid; grid-template-columns: 145px minmax(0, 1fr); align-items: center; gap: 12px; }
+.timeline-label { min-width: 0; }
+.timeline-label strong, .timeline-label small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.timeline-label strong { color: #dbeafe; font-size: 11px; }
+.timeline-label small { margin-top: 2px; color: var(--muted); font-size: 9px; }
+.timeline-track { position: relative; height: 16px; border: 1px solid var(--line); border-radius: 999px; background: rgba(3, 7, 18, 0.72); }
+.timeline-segment { position: absolute; top: 3px; bottom: 3px; border-radius: 999px; background: linear-gradient(90deg, rgba(56, 189, 248, .35), rgba(103, 232, 249, .65)); }
+.timeline-segment.listener { background: linear-gradient(90deg, rgba(167, 139, 250, .25), rgba(192, 132, 252, .50)); }
+.timeline-segment.performer { background: linear-gradient(90deg, rgba(52, 211, 153, .25), rgba(110, 231, 183, .50)); }
+.timeline-beat { position: absolute; top: 50%; width: 7px; height: 7px; z-index: 2; border: 1px solid #06101d; border-radius: 50%; transform: translate(-50%, -50%); background: var(--orange); box-shadow: 0 0 8px rgba(251, 146, 60, .7); }
+.timeline-beat.speech { background: var(--cyan); box-shadow: 0 0 8px rgba(103, 232, 249, .7); }
+.timeline-beat.listener_reaction { background: #c084fc; box-shadow: 0 0 8px rgba(192, 132, 252, .7); }
+
 .editor-grid, .lower-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
 .editor-card, .console-card, .preview-card, .quality-card { min-width: 0; padding: 18px; }
 .card-header { justify-content: space-between; gap: 14px; margin-bottom: 14px; }
@@ -329,4 +346,5 @@ select:focus { border-color: var(--cyan); }
   .hero { padding: 23px; }
   .hero-orbit { display: none; }
   .quality-list { grid-template-columns: 1fr; }
+  .timeline-row { grid-template-columns: 96px minmax(0, 1fr); }
 }

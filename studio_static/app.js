@@ -31,6 +31,8 @@ const elements = {
   metricGestures: document.querySelector("#metric-gestures"),
   metricGesturesDetail: document.querySelector("#metric-gestures-detail"),
   metricCost: document.querySelector("#metric-cost"),
+  directionSummary: document.querySelector("#direction-summary"),
+  directionTimeline: document.querySelector("#direction-timeline"),
   toast: document.querySelector("#toast"),
 };
 
@@ -116,7 +118,7 @@ function renderReport(report) {
   elements.metricShots.textContent = summary.shot_count;
   elements.metricCues.textContent = summary.mouth_cue_count;
   elements.metricGestures.textContent = summary.gesture_count ?? 0;
-  elements.metricGesturesDetail.textContent = `${summary.pose_keyframe_count ?? 0} pose keys`;
+  elements.metricGesturesDetail.textContent = `${summary.pose_keyframe_count ?? 0} pose · ${summary.blink_event_count ?? 0} blink`;
   elements.metricCost.textContent = `$${summary.estimated_cost}`;
   setChip(elements.qualityChip, report.status.toUpperCase(), report.status === "complete" ? "ok" : "danger");
   elements.qualityList.replaceChildren();
@@ -136,6 +138,65 @@ function renderReport(report) {
   });
 }
 
+function renderDirection(manifest, report) {
+  const performance = manifest?.performance;
+  const summary = manifest?.summary;
+  elements.directionTimeline.replaceChildren();
+  if (!performance?.clips?.length || !summary) {
+    elements.directionSummary.textContent = "Chưa có manifest";
+    const empty = document.createElement("p");
+    empty.className = "empty-copy";
+    empty.textContent = "Chạy production để tạo dialogue beats, gaze, blink và listener reactions.";
+    elements.directionTimeline.append(empty);
+    return;
+  }
+  const conflicts = summary.performance_conflict_count ?? 0;
+  elements.directionSummary.textContent =
+    `${summary.dialogue_beat_count} beat · ${summary.gaze_target_count} gaze · ` +
+    `${summary.blink_event_count} blink · ${summary.listener_reaction_count} reaction · ` +
+    `${conflicts} conflict`;
+  elements.directionSummary.classList.toggle("danger", conflicts > 0);
+
+  const frameStart = Number(manifest.frame_start);
+  const span = Math.max(1, Number(manifest.frame_end) - frameStart);
+  performance.clips.forEach(clip => {
+    const row = document.createElement("div");
+    row.className = "timeline-row";
+    const label = document.createElement("div");
+    label.className = "timeline-label";
+    const name = document.createElement("strong");
+    name.textContent = clip.character;
+    const role = document.createElement("small");
+    role.textContent = `${clip.role} · ${clip.shot_id.replace("scene_001_", "")}`;
+    label.append(name, role);
+
+    const track = document.createElement("div");
+    track.className = "timeline-track";
+    const segment = document.createElement("div");
+    segment.className = `timeline-segment ${clip.role}`;
+    segment.style.left = `${100 * (clip.start_frame - frameStart) / span}%`;
+    segment.style.width = `${Math.max(1.2, 100 * (clip.end_frame - clip.start_frame) / span)}%`;
+    segment.title = `${clip.character}: ${clip.gestures.join(", ") || "idle"}`;
+    track.append(segment);
+    (clip.beats || []).forEach(beat => {
+      const dot = document.createElement("span");
+      dot.className = `timeline-beat ${beat.type}`;
+      dot.style.left = `${100 * (beat.peak_frame - frameStart) / span}%`;
+      dot.title = beat.gesture ? `${beat.type}: ${beat.gesture}` : beat.type;
+      track.append(dot);
+    });
+    row.append(label, track);
+    elements.directionTimeline.append(row);
+  });
+
+  const applied = report?.summary;
+  if (applied) {
+    elements.directionSummary.title =
+      `${applied.gaze_keyframe_count ?? 0} gaze keys · ` +
+      `${applied.blink_keyframe_count ?? 0} blink keys`;
+  }
+}
+
 async function loadDocument(name) {
   try { return await api(`/api/documents/${name}`); }
   catch (error) {
@@ -146,9 +207,10 @@ async function loadDocument(name) {
 
 async function loadStatus() {
   try {
-    const [status, script, motion, report] = await Promise.all([
+    const [status, script, motion, report, manifest] = await Promise.all([
       api("/api/status"), api("/api/script"),
       loadDocument("motion_intent"), loadDocument("production_report"),
+      loadDocument("phase3_manifest"),
     ]);
     setChip(elements.projectChip, `${status.project_name} · v${status.pipeline_version}`, "ok");
     setChip(elements.ollamaChip,
@@ -159,6 +221,7 @@ async function loadStatus() {
     elements.scriptState.textContent = "Đã đồng bộ";
     renderMotion(motion);
     renderReport(report);
+    renderDirection(manifest, report);
     refreshVideo(status.artifacts.final_video);
     if (status.job?.status === "running") {
       jobOffset = 0;

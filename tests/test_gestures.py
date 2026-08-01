@@ -4,7 +4,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from anime_pipeline.gestures import build_pose_keyframes
+from anime_pipeline.gestures import PITCH, ROLL, YAW, build_pose_keyframes
 
 
 class GestureExecutorTests(unittest.TestCase):
@@ -31,25 +31,75 @@ class GestureExecutorTests(unittest.TestCase):
 
     def test_look_down_and_nod_create_visible_head_pitch(self):
         keys = build_pose_keyframes(self.performance(gestures=["look_down", "nod"]))
-        self.assertGreater(max(key["rotations"]["head"][0] for key in keys), 0.2)
+        self.assertGreater(max(key["rotations"]["head"][PITCH] for key in keys), 0.2)
 
-    def test_look_target_controls_head_yaw_direction(self):
+    def test_look_target_controls_yaw_without_creating_mirrored_roll(self):
+        neutral = build_pose_keyframes(self.performance(), look_direction=0.0)
         right = build_pose_keyframes(self.performance(), look_direction=1.0)
         left = build_pose_keyframes(self.performance(), look_direction=-1.0)
-        self.assertGreater(right[2]["rotations"]["head"][2], 0)
-        self.assertLess(left[2]["rotations"]["head"][2], 0)
+        self.assertGreater(right[2]["rotations"]["head"][YAW],
+                           neutral[2]["rotations"]["head"][YAW])
+        self.assertLess(left[2]["rotations"]["head"][YAW],
+                        neutral[2]["rotations"]["head"][YAW])
+        self.assertEqual(right[2]["rotations"]["head"][ROLL],
+                         neutral[2]["rotations"]["head"][ROLL])
+        self.assertEqual(left[2]["rotations"]["head"][ROLL],
+                         neutral[2]["rotations"]["head"][ROLL])
+
+    def test_head_tilt_uses_roll_not_look_yaw(self):
+        neutral = build_pose_keyframes(self.performance(gestures=[]))
+        tilted = build_pose_keyframes(self.performance(gestures=["head_tilt"]))
+        self.assertGreater(tilted[2]["rotations"]["head"][ROLL],
+                           neutral[2]["rotations"]["head"][ROLL])
+        self.assertEqual(tilted[2]["rotations"]["head"][YAW],
+                         neutral[2]["rotations"]["head"][YAW])
 
     def test_wind_sway_moves_spine_more_than_baseline(self):
         baseline = build_pose_keyframes(self.performance(gestures=[]))
         windy = build_pose_keyframes(self.performance(gestures=["wind_sway"]))
-        self.assertGreater(abs(windy[1]["rotations"]["spine"][1]),
-                           abs(baseline[1]["rotations"]["spine"][1]))
+        self.assertGreater(abs(windy[1]["rotations"]["spine"][ROLL]),
+                           abs(baseline[1]["rotations"]["spine"][ROLL]))
 
     def test_rejects_unknown_gesture_and_invalid_frames(self):
         with self.assertRaisesRegex(ValueError, "unsupported"):
             build_pose_keyframes(self.performance(gestures=["execute_code"]))
         with self.assertRaisesRegex(ValueError, "ordered"):
             build_pose_keyframes(self.performance(start_frame=10, end_frame=5))
+
+    def test_dialogue_beat_adds_keyframes_and_times_nod_to_peak(self):
+        performance = self.performance(
+            gestures=["nod"],
+            beats=[{
+                "type": "gesture", "gesture": "nod",
+                "start_frame": 8, "peak_frame": 14, "end_frame": 22,
+            }],
+        )
+        keys = build_pose_keyframes(performance)
+        by_frame = {key["frame"]: key for key in keys}
+        self.assertIn(14, by_frame)
+        self.assertGreater(by_frame[14]["rotations"]["head"][0],
+                           by_frame[8]["rotations"]["head"][0])
+
+    def test_listener_reaction_is_subtle_and_bounded(self):
+        performance = self.performance(
+            action="idle", gestures=["breathe"], role="listener",
+            beats=[{
+                "type": "listener_reaction", "gesture": None,
+                "start_frame": 20, "peak_frame": 27, "end_frame": 35,
+            }],
+        )
+        keys = build_pose_keyframes(performance)
+        peak = next(key for key in keys if key["frame"] == 27)
+        self.assertGreater(peak["rotations"]["head"][0], 0)
+        self.assertLess(peak["rotations"]["head"][0], 0.1)
+
+    def test_sad_emotion_changes_resting_head_and_spine_posture(self):
+        neutral = build_pose_keyframes(self.performance(emotion="neutral"))
+        sad = build_pose_keyframes(self.performance(emotion="sad"))
+        self.assertGreater(sad[2]["rotations"]["head"][0],
+                           neutral[2]["rotations"]["head"][0])
+        self.assertGreater(sad[2]["rotations"]["spine"][0],
+                           neutral[2]["rotations"]["spine"][0])
 
 
 if __name__ == "__main__":

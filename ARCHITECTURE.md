@@ -25,6 +25,8 @@
    intent, allowlisted jobs, artifact preview, and quality visualization.
 10. **Gesture executor (Phase 6.1)** — semantic gesture clips, fixed bone aliases,
     deterministic pose synthesis, and Blender keyframe insertion.
+11. **Performance Director (Phase 6.2)** — dialogue beat timing, speaker/listener
+    roles, gaze targets, deterministic blinks, emotional posture, and conflict audit.
 
 ## Project directory contract
 
@@ -92,6 +94,13 @@ Neither Ollama nor edited JSON can specify a real bone name, rotation, data path
 or keyframe. Phase 5 rejects a production if a required alias is missing or a
 performance clip creates no pose keys.
 
+Phase 6.2 never changes that authority boundary. It derives timing and secondary
+acting only from validated screenplay, dialogue timeline, and motion intent.
+Blink schedules use stable project/character hashes rather than nondeterministic
+randomness. The manifest carries events, while Blender chooses only fixed
+application-owned targets: common blink morph aliases, an optional eye bone, or
+the demo eye-mesh fallback.
+
 ## Failure boundaries
 
 - Invalid configuration stops before any production output is written.
@@ -108,6 +117,8 @@ performance clip creates no pose keys.
   document/artifact allowlists.
 - Unknown procedural gestures fail validation, generated rotations are clamped,
   and unresolved bone aliases fail the final production gate.
+- Overlapping character clips, missing gaze keys, or missing blink keys fail the
+  Performance Director release gate.
 
 ## Security and licensing
 

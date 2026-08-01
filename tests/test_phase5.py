@@ -29,6 +29,7 @@ class Phase5Tests(unittest.TestCase):
             )
             self.assertEqual(report["status"], "complete")
             self.assertEqual(report["summary"]["failed_gate_count"], 0)
+            self.assertEqual(report["summary"]["quality_gate_count"], 29)
             self.assertEqual(report["summary"]["mouth_cue_count"], 2)
             self.assertTrue(output.is_file())
             self.assertIn("final_video", [item["name"] for item in report["artifacts"]])
@@ -42,9 +43,11 @@ class Phase5Tests(unittest.TestCase):
             manifest["performance"]["source"] = "rules"
             manifest["performance"]["clips"] = [{
                 "scene_id": "scene_001", "shot_id": "scene_001_shot_001",
-                "character": "Aiko", "start_frame": 1, "end_frame": 48,
+                "character": "Aiko", "role": "speaker",
+                "start_frame": 1, "end_frame": 48,
                 "action": "idle_talking", "emotion": "neutral",
                 "intensity": 0.2, "gestures": ["breathe"], "look_at": None,
+                "beats": [],
             }]
             manifest["summary"]["performance_clip_count"] = 1
             manifest["summary"]["gesture_count"] = 1
@@ -67,6 +70,63 @@ class Phase5Tests(unittest.TestCase):
             )
             gate = next(item for item in report["quality_gates"]
                         if item["name"] == "procedural_gestures_applied")
+            self.assertEqual(gate["status"], "passed")
+
+    def test_performance_direction_requires_gaze_and_blink_keys(self):
+        with tempfile.TemporaryDirectory() as directory:
+            project = Path(directory)
+            self._write_fixture(project)
+            manifest_path = project / "generated" / "phase3_manifest.json"
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            manifest["performance"].update({
+                "source": "rules",
+                "clips": [{
+                    "scene_id": "scene_001", "shot_id": "scene_001_shot_001",
+                    "character": "Aiko", "role": "speaker", "start_frame": 1,
+                    "end_frame": 48, "action": "idle_talking", "emotion": "neutral",
+                    "intensity": 0.2, "gestures": ["breathe"], "look_at": "Ren",
+                    "beats": [{"type": "speech", "gesture": None, "start_frame": 1,
+                               "peak_frame": 12, "end_frame": 25}],
+                }],
+                "gaze_events": [{"scene_id": "scene_001", "shot_id": "scene_001_shot_001",
+                                 "character": "Aiko", "target": "Ren",
+                                 "start_frame": 1, "end_frame": 48}],
+                "blink_events": [{"character": "Aiko", "close_frame": 20,
+                                  "open_frame": 23}],
+                "dialogue_beat_count": 1, "listener_reaction_count": 0,
+                "performance_conflict_count": 0,
+            })
+            manifest["summary"].update({
+                "performance_clip_count": 1, "gesture_count": 1,
+                "dialogue_beat_count": 1, "gaze_target_count": 1,
+                "blink_event_count": 1, "listener_reaction_count": 0,
+                "performance_conflict_count": 0,
+            })
+            atomic_write_json(manifest_path, manifest)
+            scene_path = project / "generated" / "phase3_scene_report.json"
+            scene_report = json.loads(scene_path.read_text(encoding="utf-8"))
+            scene_report.update({
+                "performance_target_count": 1, "performance_clip_count": 1,
+                "gesture_count": 1, "pose_keyframe_count": 6,
+                "dialogue_beat_count": 1, "gaze_target_count": 1,
+                "gaze_keyframe_count": 0, "blink_target_count": 1,
+                "blink_event_count": 1, "blink_keyframe_count": 0,
+                "listener_reaction_count": 0, "performance_conflict_count": 0,
+            })
+            atomic_write_json(scene_path, scene_report)
+
+            with self.assertRaisesRegex(QualityGateError, "performance_direction_applied"):
+                Phase5Auditor(self._config(project), self.schemas).run(
+                    tool_versions=self.tool_versions
+                )
+
+            scene_report.update({"gaze_keyframe_count": 4, "blink_keyframe_count": 3})
+            atomic_write_json(scene_path, scene_report)
+            report, _ = Phase5Auditor(self._config(project), self.schemas).run(
+                tool_versions=self.tool_versions
+            )
+            gate = next(item for item in report["quality_gates"]
+                        if item["name"] == "performance_direction_applied")
             self.assertEqual(gate["status"], "passed")
 
     def test_missing_final_video_fails_gate_and_writes_report(self):
@@ -173,20 +233,26 @@ class Phase5Tests(unittest.TestCase):
             "duration_seconds": 1.0, "mouth_cues": cues,
         })
         manifest = {
-            "version": 2, "project_name": "Phase 5 Test", "fps": 24, "frame_start": 1, "frame_end": 48,
+            "version": 3, "project_name": "Phase 5 Test", "fps": 24, "frame_start": 1, "frame_end": 48,
             "base_scene": "blender_scenes/base.blend", "output_scene": "blender_scenes/assembled.blend",
             "preview_video": "renders/preview.mp4",
             "render": {"engine": "BLENDER_EEVEE", "width": 1280, "height": 720, "resolution_percentage": 50},
             "camera": {},
             "performance": {"enabled": True, "source": None,
-                            "amplitude_scale": 1.0, "clips": []},
+                            "amplitude_scale": 1.0, "clips": [],
+                            "gaze_events": [], "blink_events": [],
+                            "dialogue_beat_count": 0, "listener_reaction_count": 0,
+                            "performance_conflict_count": 0},
             "shots": [{"scene_id": "scene_001", "shot_id": "scene_001_shot_001", "start_frame": 1,
                        "end_frame": 48, "shot_type": "medium", "movement": "static", "target": "Aiko"}],
             "dialogue": [{"line_id": "line_001", "shot_id": "scene_001_shot_001", "character": "Aiko",
                           "audio_path": "dialogue/line_001.wav", "start_frame": 1, "end_frame": 25,
                           "start_seconds": 0.0, "duration_seconds": 1.0, "mouth_cues": cues}],
             "summary": {"shot_count": 1, "dialogue_count": 1, "mouth_cue_count": 2,
-                        "performance_clip_count": 0, "gesture_count": 0},
+                        "performance_clip_count": 0, "gesture_count": 0,
+                        "dialogue_beat_count": 0, "gaze_target_count": 0,
+                        "blink_event_count": 0, "listener_reaction_count": 0,
+                        "performance_conflict_count": 0},
         }
         atomic_write_json(project / "generated" / "phase3_manifest.json", manifest)
         (project / "blender_scenes" / "assembled.blend").write_bytes(b"BLENDER" * 32)
@@ -197,6 +263,10 @@ class Phase5Tests(unittest.TestCase):
             "mouth_cue_count": 2, "performance_target_count": 0,
             "performance_clip_count": 0, "gesture_count": 0, "pose_keyframe_count": 0,
             "skipped_bone_alias_count": 0, "scene_file": "blender_scenes/assembled.blend",
+            "dialogue_beat_count": 0, "gaze_target_count": 0,
+            "gaze_keyframe_count": 0, "blink_target_count": 0,
+            "blink_event_count": 0, "blink_keyframe_count": 0,
+            "listener_reaction_count": 0, "performance_conflict_count": 0,
             "preview_video": "renders/preview.mp4",
         })
         (project / "subtitles" / "dialogue.srt").write_text("1\n00:00:00,000 --> 00:00:01,000\nXin chào\n", encoding="utf-8")

@@ -29,6 +29,7 @@ DOCUMENTS = {
     "screenplay": "generated/screenplay.json",
     "motion_intent": "generated/motion_intent_plan.json",
     "motion_plan": "generated/motion_plan.json",
+    "phase3_manifest": "generated/phase3_manifest.json",
     "production_report": "generated/production_report.json",
 }
 ARTIFACTS = {
