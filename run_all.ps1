@@ -113,7 +113,7 @@ Invoke-PipelineStage "phase1_phase2" 2 {
     if ($LASTEXITCODE -ne 0) { throw "Phase 1/2 failed with exit code $LASTEXITCODE" }
 }
 
-Invoke-PipelineStage "phase3_blender" 3 {
+Invoke-PipelineStage "phase3_blender_phase8_harmonization" 8 {
     & ".\run_phase3.ps1" -Blender $Blender -Project $ProjectPath -Render -SkipPhase2
     if ($LASTEXITCODE -ne 0) { throw "Phase 3 failed with exit code $LASTEXITCODE" }
 }
@@ -134,6 +134,6 @@ $ProductionReport = Join-Path $ProjectPath "generated\production_report.json"
 $ProductionData = Get-Content $ProductionReport -Raw -Encoding UTF8 | ConvertFrom-Json
 $FinalArtifact = $ProductionData.artifacts | Where-Object { $_.name -eq "final_video" } | Select-Object -First 1
 $FinalVideo = Join-Path $ProjectPath $FinalArtifact.path
-Write-Host "`nALL 5 PHASES COMPLETE" -ForegroundColor Green
+Write-Host "`nPRODUCTION PIPELINE THROUGH PHASE 8 COMPLETE" -ForegroundColor Green
 Write-Host "Final video: $FinalVideo"
 Write-Host "Production report: $ProductionReport"

@@ -112,6 +112,21 @@ phase7:
   require_blink_morph: true
   require_complete_textures: true
   require_license_metadata: false
+phase8:
+  enabled: true
+  report: generated/phase8_harmonization_report.json
+  default_target_height_meters: 1.72
+  character_heights:
+    Aiko: 1.68
+    Ren: 1.78
+  floor_z: 0.0
+  height_tolerance_ratio: 0.02
+  ground_tolerance_meters: 0.015
+  rest_pose_max_degrees: 18.0
+  neutral_arm_degrees: 12.0
+  safe_frame_fraction: 0.88
+  headroom_fraction: 0.06
+  footroom_fraction: 0.04
 characters:
   Aiko:
     model_id: aiko_demo

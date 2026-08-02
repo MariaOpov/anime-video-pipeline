@@ -31,6 +31,8 @@
     facing, shot composition, bounded camera motion, and blocking risk audit.
 13. **Character onboarding (Phase 7)** — content-addressed PMX/PMD bundles,
     normalized Blender caches, trusted bone/morph aliases, and asset readiness gates.
+14. **Character Harmonizer (Phase 8)** — canonical semantic controls, quaternion
+    rest-pose correction, cast scale/grounding, evaluated bounds, and adaptive framing.
 
 ## Project directory contract
 
@@ -52,6 +54,10 @@ project/
 │   ├── motion_plan.json
 │   ├── pipeline_state.json
 │   ├── motion_intent_plan.json
+│   ├── phase3_manifest.json
+│   ├── phase3_scene_report.json
+│   ├── phase8_harmonization_plan.json
+│   ├── phase8_harmonization_report.json
 │   ├── phase5_run_record.json
 │   └── production_report.json
 ├── local_assets/                 # ignored; source bundles, profiles, registry
@@ -120,6 +126,16 @@ available images, and writes a schema-validated profile. Phase 3 sees only an
 activated profile with project-relative paths and application-owned aliases;
 the original PMX and textures are never read directly during normal production.
 
+Phase 8 operates after cache append and before performance/camera assembly. It
+resolves every armature to the same application-owned root, body, eye, and IK
+semantics; source-specific names never enter gesture code. Blender composes
+bounded gesture quaternions over a neutral dialogue pose, scales each cast
+member to configured proportions, grounds its evaluated mesh, and moves the
+pipeline root rather than destroying the grounding offset. Camera placement is
+then recomputed at each shot boundary from evaluated world-space bounds and the
+real head target. A separate schema-validated report records both character and
+shot evidence.
+
 ## Failure boundaries
 
 - Invalid configuration stops before any production output is written.
@@ -142,6 +158,9 @@ the original PMX and textures are never read directly during normal production.
   clearance risk fails the Cinematic Blocking release gate.
 - Missing character cache, required rig/mouth/blink aliases, or required texture
   and license metadata prevents Phase 7 activation and fails the release gate.
+- An A/T-pose residual, height mismatch, axis inversion, floor error, missing
+  canonical control, cropped required region, or hidden head/feet prevents
+  Phase 8 rendering and fails the release gate.
 
 ## Security and licensing
 

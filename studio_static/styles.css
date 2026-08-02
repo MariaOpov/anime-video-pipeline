@@ -231,7 +231,7 @@ select:focus { border-color: var(--cyan); }
 .orbit-b { inset: 28px; border-color: rgba(251, 146, 60, 0.28); transform: rotateX(66deg); }
 .orbit-core { width: 58px; height: 58px; display: grid; place-items: center; border-radius: 50%; color: var(--cyan); font-size: 24px; font-weight: 300; background: #0a1120; box-shadow: 0 0 42px rgba(56, 189, 248, 0.23); }
 
-.metrics { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 12px; }
+.metrics { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 12px; }
 .metric { padding: 17px 19px; }
 .metric span, .metric small { display: block; color: var(--muted); }
 .metric span { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; }

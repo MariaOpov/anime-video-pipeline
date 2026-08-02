@@ -10,6 +10,7 @@ from .character_assets import build_character_contract
 from .cinematography import direct_cinematography
 from .config import ProjectConfig
 from .direction import direct_performance
+from .harmonization import build_harmonization_contract
 from .io_utils import atomic_write_json, load_json, validate
 from .motion_ai import validate_motion_intent
 
@@ -72,12 +73,25 @@ class Phase3Planner:
             })
 
         performance = self._build_performance(shots, timeline)
-        blocking = self._build_blocking(shots, performance)
         character_assets = build_character_contract(
             self.config.project_dir,
             self.config.data.get("phase7", {}),
             self.schemas,
         )
+        harmonization = build_harmonization_contract(
+            character_assets,
+            self.config.data.get("characters", {}),
+            self.config.data.get("phase8", {}),
+        )
+        phase8_report = (self.config.project_dir / harmonization["report"]).resolve()
+        try:
+            phase8_report.relative_to(self.config.project_dir.resolve())
+        except ValueError as exc:
+            raise ValueError("phase8.report must stay inside the project directory") from exc
+        harmonization["report"] = phase8_report.relative_to(
+            self.config.project_dir.resolve()
+        ).as_posix()
+        blocking = self._build_blocking(shots, performance, harmonization)
 
         dialogue = []
         cue_total = 0
@@ -111,7 +125,7 @@ class Phase3Planner:
                             float(timeline.get("total_duration_seconds", 0)))
         output = self.config.data["output"]
         manifest = {
-            "version": 5, "project_name": self.config.data["project_name"],
+            "version": 6, "project_name": self.config.data["project_name"],
             "fps": self.config.fps, "frame_start": 1,
             "frame_end": max(1, math.ceil(total_seconds * self.config.fps)),
             "base_scene": base_scene.relative_to(self.config.project_dir).as_posix(),
@@ -124,6 +138,7 @@ class Phase3Planner:
             },
             "camera": self.settings.get("camera", {}), "performance": performance,
             "blocking": blocking, "character_assets": character_assets,
+            "harmonization": harmonization,
             "shots": shots, "dialogue": dialogue,
             "summary": {"shot_count": len(shots), "dialogue_count": len(dialogue),
                         "mouth_cue_count": cue_total,
@@ -148,7 +163,12 @@ class Phase3Planner:
                         "character_asset_ready_count": character_assets["ready_count"],
                         "character_texture_missing_count": character_assets["missing_texture_count"],
                         "character_asset_warning_count": character_assets["warning_count"],
-                        "character_license_warning_count": character_assets["license_warning_count"]},
+                        "character_license_warning_count": character_assets["license_warning_count"],
+                        "harmonization_character_count": harmonization["configured_count"],
+                        "harmonization_ready_count": harmonization["ready_count"],
+                        "adaptive_camera_shot_count": (
+                            len(shots) if harmonization["enabled"] else 0
+                        )},
         }
         validate(manifest, self.schemas / "phase3_manifest.schema.json", "Phase 3 manifest")
         return manifest
@@ -157,6 +177,10 @@ class Phase3Planner:
         manifest = manifest or self.build()
         output = self.config.generated_dir / "phase3_manifest.json"
         atomic_write_json(output, manifest)
+        atomic_write_json(
+            self.config.generated_dir / "phase8_harmonization_plan.json",
+            manifest["harmonization"],
+        )
         return output
 
     def _project_path(self, key: str, default: str) -> Path:
@@ -223,11 +247,16 @@ class Phase3Planner:
         return result
 
     def _build_blocking(self, shots: list[dict[str, Any]],
-                        performance: dict[str, Any]) -> dict[str, Any]:
+                        performance: dict[str, Any],
+                        harmonization: dict[str, Any]) -> dict[str, Any]:
         phase6 = self.config.data.get("phase6", {})
         settings = phase6.get("cinematic_blocking")
         if settings is None:
             settings = {"enabled": False}
+        camera_settings = dict(self.settings.get("camera", {}))
+        output = self.config.data["output"]
+        camera_settings["aspect_ratio"] = float(output["width"]) / float(output["height"])
         return direct_cinematography(
-            shots, performance, self.settings.get("camera", {}), settings
+            shots, performance, camera_settings, settings,
+            harmonization=harmonization,
         )

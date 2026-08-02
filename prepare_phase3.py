@@ -43,6 +43,9 @@ def main() -> int:
         f"{summary['framing_risk_count']} framing risk(s), "
         f"{summary['character_asset_ready_count']}/{summary['production_character_count']} "
         f"production character(s) ready. Output: {output}"
+        f" Phase 8: {summary['harmonization_ready_count']}/"
+        f"{summary['harmonization_character_count']} character(s) planned, "
+        f"{summary['adaptive_camera_shot_count']} adaptive camera shot(s)."
     )
     return 0
 

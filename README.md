@@ -1,4 +1,4 @@
-# Anime Video Pipeline — Phase 7
+# Anime Video Pipeline — Phase 8
 
 A Windows-first foundation for an offline, reusable anime production pipeline.
 Phase 1 turns a text script into validated screenplay and shot-list JSON, indexes
@@ -21,6 +21,11 @@ Phase 7 onboards real PMX/PMD characters through a guarded local import,
 normalizes and caches them, maps trusted rig and facial aliases, and blocks
 production when model, texture, morph, or license checks do not satisfy the
 project policy.
+Phase 8 gives every cast member a canonical root/spine/head/arms/legs/eyes/IK
+contract, converts A/T poses to a neutral dialogue rest pose with quaternion
+correction, normalizes cast proportions, locks characters to the floor, and
+frames each shot from evaluated world-space bounds. A failed harmonization or
+framing audit blocks rendering and release.
 
 ## Architecture
 
@@ -60,6 +65,9 @@ Phase 3 manifest ----------> Blender blocking/cameras + WAV + mouth/pose keys
           ^
           |
  Phase 7 local PMX --------> inspected rig/morph/texture cache
+          |
+          v
+ Phase 8 harmonization ----> neutral pose / scale / grounding / adaptive camera
           |
           v
 Phase 3 preview -----------> SRT + loudness normalization + final MP4
@@ -156,6 +164,16 @@ The original model folder, staged bundle, profile, registry, and Blender cache
 stay local and are excluded from Git. See `PHASE7.md` before publishing any
 model-derived output or redistributing assets.
 
+Audit character harmonization without rendering:
+
+```powershell
+.\run_phase8.ps1
+```
+
+Add `-Render` only after the report is clean. Phase 8 writes diagnostics before
+render approval and exits non-zero if any cast member or shot is not production
+ready. See `PHASE8.md` for configuration and acceptance.
+
 Optional local LLM:
 
 ```powershell
@@ -190,6 +208,7 @@ never modified. For Vietnamese and other non-English dialogue, use Rhubarb's
 ## Phase 3 outputs
 
 - `generated/phase3_manifest.json`: validated Blender assembly and blocking contract.
+- `generated/phase8_harmonization_plan.json`: deterministic cast target/control plan.
 - `blender_scenes/phase3_assembled.blend`: cameras, sound strips, mouth keys,
   and procedural body-pose keyframes.
 - `generated/phase3_scene_report.json`: machine-readable assembly result.
@@ -213,9 +232,10 @@ temporary MP4, verified, and atomically promoted to `final_video.mp4`.
 - `generated/phase5_run_record.json`: status and elapsed time for every stage.
 - `generated/production_report.json`: tool versions, QA results, metrics, and artifacts.
 
-Phase 5 checks all Phase 1–4 contracts, enforces configurable warning limits,
-compares Blender counts to the manifest, and verifies final subtitles, audio,
-duration, dimensions, and file size. See `PHASE5.md` for the full release gate.
+Phase 5 checks the Phase 1–4 delivery contracts plus integrated Phase 6–8
+performance, asset, and harmonization evidence; it compares Blender counts to
+the manifest and verifies final subtitles, audio, duration, dimensions, and file
+size. See `PHASE5.md` for the full release gate.
 
 ## Phase 6 outputs
 
@@ -277,10 +297,24 @@ and facial aliases, packs available images, and saves a character-only Blender
 cache. Its validated profile becomes a local registry entry; Phase 3 then
 replaces only the matching mannequin.
 
-The manifest is version 5 and records only safe project-relative cache/profile
+The Phase 7 portion of manifest version 6 records only safe project-relative cache/profile
 contracts plus coverage metrics. Phase 5 requires every configured production
 character to load with matching bone, mouth, texture, and license counts,
 raising the complete demo audit to 31 gates. See `PHASE7.md`.
+
+## Phase 8 Character Harmonization
+
+Phase 8 upgrades the manifest to version 6 and separates model onboarding from
+shot-time harmonization. The shared alias contract recognizes Japanese,
+Chinese, common humanoid, and Blender-suffixed bone names. Missing source root
+or leg-IK controls receive deterministic pipeline-owned root/foot-lock
+fallbacks; gesture deltas are composed over the neutral quaternion pose.
+
+Blender measures evaluated meshes after pose, scale, grounding, blocking, and
+animation. Full-body shots must retain head and feet; close-ups must retain the
+face region. It writes `generated/phase8_harmonization_report.json`, and Phase 5
+adds schema, character-readiness, and adaptive-framing gates for 34 total gates.
+See `PHASE8.md`.
 
 ## Asset metadata
 
@@ -304,6 +338,6 @@ production outputs. Use `--verbose` for console debug messages.
 
 ## Possible extensions
 
-1. Optional ComfyUI backgrounds and image-to-video inserts.
-2. Retarget and curate a production VMD motion library for onboarded rigs.
-3. Environment-aware blocking, occlusion checks, and model-specific cloth/hair wind.
+1. Phase 9 motion retargeting and a curated production VMD library.
+2. Environment-aware blocking, occlusion checks, and model-specific cloth/hair wind.
+3. Optional ComfyUI backgrounds and image-to-video inserts.

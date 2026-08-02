@@ -5,31 +5,21 @@ from __future__ import annotations
 import argparse
 import json
 import math
-import re
+import os
 import sys
 from pathlib import Path
 
 import bpy
 from mathutils import Vector
 
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "src"))
 
-BONE_ALIASES = {
-    "spine": ("上半身2", "上半身", "spine", "upper_body", "upper body"),
-    "head": ("頭", "head"),
-    "arm.L": ("左腕", "腕.L", "arm.L", "upper_arm.L", "left arm"),
-    "arm.R": ("右腕", "腕.R", "arm.R", "upper_arm.R", "right arm"),
-    "leg.L": ("左足", "足.L", "leg.L", "thigh.L", "left leg"),
-    "leg.R": ("右足", "足.R", "leg.R", "thigh.R", "right leg"),
-    "eyes": ("両目", "目", "eyes", "eye"),
-}
-MORPH_ALIASES = {
-    "A": ("あ", "a", "mouth_a", "aa"),
-    "I": ("い", "i", "mouth_i", "ih"),
-    "U": ("う", "u", "mouth_u", "ou"),
-    "E": ("え", "e", "mouth_e", "eh"),
-    "O": ("お", "o", "mouth_o", "oh"),
-    "blink": ("まばたき", "blink", "eye_blink", "eyeblink"),
-}
+from anime_pipeline.rig_contract import (  # noqa: E402
+    BONE_ALIASES,
+    MORPH_ALIASES,
+    match_aliases,
+)
 
 
 def arguments():
@@ -44,22 +34,15 @@ def load_json(path: Path):
         return json.load(handle)
 
 
-def fold(value: str) -> str:
-    return re.sub(r"[\s_.-]+", "", value.casefold())
-
-
-def match(names, aliases):
-    exact = {name.casefold(): name for name in names}
-    folded = {fold(name): name for name in names}
-    result = {}
-    for alias, candidates in aliases.items():
-        value = next((exact[item.casefold()] for item in candidates
-                      if item.casefold() in exact), None)
-        if value is None:
-            value = next((folded[fold(item)] for item in candidates
-                          if fold(item) in folded), None)
-        result[alias] = value
-    return result
+def atomic_write_json(path: Path, payload: dict) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_name(f".{path.name}.tmp")
+    with temporary.open("w", encoding="utf-8", newline="\n") as handle:
+        json.dump(payload, handle, ensure_ascii=False, indent=2)
+        handle.write("\n")
+        handle.flush()
+        os.fsync(handle.fileno())
+    os.replace(temporary, path)
 
 
 def import_model(path: Path):
@@ -146,6 +129,21 @@ def texture_status():
     return count, missing, warnings
 
 
+def bone_axes(armature, mapping):
+    """Record rest-space directions for quaternion/left-right correction."""
+    result = {}
+    for alias, name in mapping.items():
+        bone = armature.data.bones.get(name) if name else None
+        if not bone:
+            continue
+        direction = bone.tail_local - bone.head_local
+        if direction.length <= 1e-8:
+            continue
+        direction.normalize()
+        result[alias] = [round(direction.x, 6), round(direction.y, 6), round(direction.z, 6)]
+    return result
+
+
 def main():
     args = arguments()
     request = load_json(args.request.resolve())
@@ -175,8 +173,8 @@ def main():
     morph_names = sorted({block.name for obj in meshes
                           if obj.data.shape_keys for block in obj.data.shape_keys.key_blocks
                           if block.name.casefold() not in {"basis", "base"}})
-    bone_mapping = match(bone_names, BONE_ALIASES)
-    morph_mapping = match(morph_names, MORPH_ALIASES)
+    bone_mapping = match_aliases(bone_names, BONE_ALIASES)
+    morph_mapping = match_aliases(morph_names, MORPH_ALIASES)
     for alias, name in bone_mapping.items():
         if name:
             armature[f"pipeline_bone_{alias.replace('.', '_')}"] = name
@@ -209,15 +207,13 @@ def main():
         "texture_count": texture_count,
         "missing_texture_count": missing_textures,
         "bone_mapping": bone_mapping,
+        "bone_axes": bone_axes(armature, bone_mapping),
         "morph_mapping": morph_mapping,
         "license": request["license"],
         "warnings": warnings,
     }
     profile_path = Path(request["profile_path"]).resolve()
-    profile_path.parent.mkdir(parents=True, exist_ok=True)
-    with profile_path.open("w", encoding="utf-8", newline="\n") as handle:
-        json.dump(profile, handle, ensure_ascii=False, indent=2)
-        handle.write("\n")
+    atomic_write_json(profile_path, profile)
     print(
         f"PHASE 7 BLENDER PROFILE: {character}, {len(meshes)} mesh(es), "
         f"{len(bone_names)} bones, {len(morph_names)} morphs, "

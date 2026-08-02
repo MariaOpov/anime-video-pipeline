@@ -53,6 +53,15 @@ if (-not (Test-Path $OutputScene -PathType Leaf)) {
 if ($Render -and (-not (Test-Path $PreviewVideo -PathType Leaf))) {
     throw "Blender finished without rendering: $PreviewVideo"
 }
+$Phase8Report = Join-Path $ProjectPath $Manifest.harmonization.report
+if ($Manifest.harmonization.enabled -and (-not (Test-Path $Phase8Report -PathType Leaf))) {
+    throw "Blender finished without the Phase 8 audit: $Phase8Report"
+}
+if ($Manifest.harmonization.enabled) {
+    & $Python verify_phase8.py --project $ProjectPath
+    if ($LASTEXITCODE -ne 0) { throw "Phase 8 schema/readiness verification failed" }
+}
 
 Write-Host "Phase 3 complete. Scene: $OutputScene"
+if ($Manifest.harmonization.enabled) { Write-Host "Phase 8 audit: $Phase8Report" }
 if ($Render) { Write-Host "Preview: $PreviewVideo" }

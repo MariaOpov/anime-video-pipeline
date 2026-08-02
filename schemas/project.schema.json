@@ -187,6 +187,28 @@
       },
       "additionalProperties": false
     },
+    "phase8": {
+      "type": "object",
+      "required": ["enabled", "report"],
+      "properties": {
+        "enabled": {"type": "boolean"},
+        "report": {"type": "string", "minLength": 1},
+        "default_target_height_meters": {"type": "number", "minimum": 0.5, "maximum": 5},
+        "character_heights": {
+          "type": "object",
+          "additionalProperties": {"type": "number", "minimum": 0.5, "maximum": 5}
+        },
+        "floor_z": {"type": "number", "minimum": -10, "maximum": 10},
+        "height_tolerance_ratio": {"type": "number", "minimum": 0, "maximum": 0.2},
+        "ground_tolerance_meters": {"type": "number", "minimum": 0, "maximum": 0.2},
+        "rest_pose_max_degrees": {"type": "number", "minimum": 0, "maximum": 45},
+        "neutral_arm_degrees": {"type": "number", "minimum": 0, "maximum": 35},
+        "safe_frame_fraction": {"type": "number", "minimum": 0.5, "maximum": 0.98},
+        "headroom_fraction": {"type": "number", "minimum": 0, "maximum": 0.2},
+        "footroom_fraction": {"type": "number", "minimum": 0, "maximum": 0.2}
+      },
+      "additionalProperties": false
+    },
     "motion_fallbacks": {
       "type": "object",
       "additionalProperties": {"type": "array", "items": {"type": "string"}}
