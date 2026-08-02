@@ -1,0 +1,242 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "phase",
+    "status",
+    "enabled",
+    "project_name",
+    "render_frame_start",
+    "render_frame_end",
+    "simulation_frame_start",
+    "simulation_frame_end",
+    "warmup_frames",
+    "warmup_evaluated_frame_count",
+    "render_timing_preserved",
+    "rigid_body_world_present",
+    "rigid_body_world_enabled",
+    "rigid_body_collection",
+    "constraint_collection",
+    "rigid_body_count",
+    "constraint_count",
+    "hidden_render_rigid_body_count",
+    "substeps_per_frame",
+    "solver_iterations",
+    "cache_frame_start",
+    "cache_frame_end",
+    "cache_is_baked",
+    "cache_is_outdated",
+    "issues"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "phase": {
+      "const": "8.1"
+    },
+    "status": {
+      "enum": [
+        "complete",
+        "failed",
+        "skipped"
+      ]
+    },
+    "enabled": {
+      "type": "boolean"
+    },
+    "project_name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "render_frame_start": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "render_frame_end": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "simulation_frame_start": {
+      "type": "integer",
+      "minimum": -10000
+    },
+    "simulation_frame_end": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "warmup_frames": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 240
+    },
+    "warmup_evaluated_frame_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "render_timing_preserved": {
+      "type": "boolean"
+    },
+    "rigid_body_world_present": {
+      "type": "boolean"
+    },
+    "rigid_body_world_enabled": {
+      "type": "boolean"
+    },
+    "rigid_body_collection": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "constraint_collection": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "rigid_body_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "constraint_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "hidden_render_rigid_body_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "substeps_per_frame": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 1
+    },
+    "solver_iterations": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 1
+    },
+    "cache_frame_start": {
+      "type": [
+        "integer",
+        "null"
+      ]
+    },
+    "cache_frame_end": {
+      "type": [
+        "integer",
+        "null"
+      ]
+    },
+    "cache_is_baked": {
+      "type": [
+        "boolean",
+        "null"
+      ]
+    },
+    "cache_is_outdated": {
+      "type": [
+        "boolean",
+        "null"
+      ]
+    },
+    "issues": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "collider_override_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "collider_overrides": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "character",
+          "collection",
+          "object",
+          "collision_shape",
+          "kinematic",
+          "radial_scale",
+          "length_scale",
+          "base_scale",
+          "applied_scale",
+          "base_dimensions",
+          "applied_dimensions"
+        ],
+        "properties": {
+          "character": {
+            "type": "string",
+            "minLength": 1
+          },
+          "collection": {
+            "type": "string",
+            "minLength": 1
+          },
+          "object": {
+            "type": "string",
+            "minLength": 1
+          },
+          "collision_shape": {
+            "type": "string",
+            "minLength": 1
+          },
+          "kinematic": {
+            "type": "boolean"
+          },
+          "radial_scale": {
+            "type": "number",
+            "minimum": 1.0
+          },
+          "length_scale": {
+            "type": "number",
+            "minimum": 1.0
+          },
+          "base_scale": {
+            "type": "array",
+            "minItems": 3,
+            "maxItems": 3,
+            "items": {
+              "type": "number"
+            }
+          },
+          "applied_scale": {
+            "type": "array",
+            "minItems": 3,
+            "maxItems": 3,
+            "items": {
+              "type": "number"
+            }
+          },
+          "base_dimensions": {
+            "type": "array",
+            "minItems": 3,
+            "maxItems": 3,
+            "items": {
+              "type": "number"
+            }
+          },
+          "applied_dimensions": {
+            "type": "array",
+            "minItems": 3,
+            "maxItems": 3,
+            "items": {
+              "type": "number"
+            }
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

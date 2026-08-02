@@ -1,0 +1,267 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": [
+    "schema_version", "phase", "status", "source_kind", "source_file",
+    "blender_version", "scene", "rigid_body_world", "characters",
+    "issues", "warnings", "summary"
+  ],
+  "properties": {
+    "schema_version": {"const": 1},
+    "phase": {"const": "8.1"},
+    "status": {"const": "complete"},
+    "source_kind": {"enum": ["character_cache", "assembled_scene"]},
+    "source_file": {"type": "string", "minLength": 1},
+    "blender_version": {"type": "string", "minLength": 1},
+    "scene": {
+      "type": "object",
+      "required": [
+        "name", "frame_start", "frame_end", "frame_current", "render_engine",
+        "render_width", "render_height", "resolution_percentage",
+        "actual_output_width", "actual_output_height"
+      ],
+      "properties": {
+        "name": {"type": "string", "minLength": 1},
+        "frame_start": {"type": "integer"},
+        "frame_end": {"type": "integer"},
+        "frame_current": {"type": "integer"},
+        "render_engine": {"type": "string", "minLength": 1},
+        "render_width": {"type": "integer", "minimum": 1},
+        "render_height": {"type": "integer", "minimum": 1},
+        "resolution_percentage": {"type": "integer", "minimum": 1, "maximum": 100},
+        "actual_output_width": {"type": "integer", "minimum": 1},
+        "actual_output_height": {"type": "integer", "minimum": 1}
+      },
+      "additionalProperties": false
+    },
+    "rigid_body_world": {"$ref": "#/$defs/rigidBodyWorld"},
+    "characters": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"$ref": "#/$defs/character"}
+    },
+    "issues": {"type": "array", "items": {"type": "string", "minLength": 1}},
+    "warnings": {"type": "array", "items": {"type": "string", "minLength": 1}},
+    "summary": {"$ref": "#/$defs/summary"}
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "nullableString": {"type": ["string", "null"]},
+    "nullableBoolean": {"type": ["boolean", "null"]},
+    "nullableInteger": {"type": ["integer", "null"]},
+    "nullableNumber": {"type": ["number", "null"]},
+    "pointCache": {
+      "type": ["object", "null"],
+      "required": [
+        "frame_start", "frame_end", "frame_step", "is_baked", "is_baking",
+        "is_outdated", "use_disk_cache", "use_library_path", "compression",
+        "name", "index"
+      ],
+      "properties": {
+        "frame_start": {"$ref": "#/$defs/nullableInteger"},
+        "frame_end": {"$ref": "#/$defs/nullableInteger"},
+        "frame_step": {"$ref": "#/$defs/nullableInteger"},
+        "is_baked": {"$ref": "#/$defs/nullableBoolean"},
+        "is_baking": {"$ref": "#/$defs/nullableBoolean"},
+        "is_outdated": {"$ref": "#/$defs/nullableBoolean"},
+        "use_disk_cache": {"$ref": "#/$defs/nullableBoolean"},
+        "use_library_path": {"$ref": "#/$defs/nullableBoolean"},
+        "compression": {},
+        "name": {"$ref": "#/$defs/nullableString"},
+        "index": {"$ref": "#/$defs/nullableInteger"}
+      },
+      "additionalProperties": false
+    },
+    "rigidBodyWorld": {
+      "type": "object",
+      "required": [
+        "present", "enabled", "collection", "constraint_collection",
+        "substeps_per_frame", "solver_iterations", "time_scale",
+        "use_split_impulse", "point_cache"
+      ],
+      "properties": {
+        "present": {"type": "boolean"},
+        "enabled": {"$ref": "#/$defs/nullableBoolean"},
+        "collection": {"$ref": "#/$defs/nullableString"},
+        "constraint_collection": {"$ref": "#/$defs/nullableString"},
+        "substeps_per_frame": {"$ref": "#/$defs/nullableInteger"},
+        "solver_iterations": {"$ref": "#/$defs/nullableInteger"},
+        "time_scale": {"$ref": "#/$defs/nullableNumber"},
+        "use_split_impulse": {"$ref": "#/$defs/nullableBoolean"},
+        "point_cache": {"$ref": "#/$defs/pointCache"}
+      },
+      "additionalProperties": false
+    },
+    "rigidBody": {
+      "type": "object",
+      "required": [
+        "object", "mmd_type", "hide_render", "hide_viewport",
+        "blender_rigid_body_present", "blender_type", "kinematic",
+        "collision_shape", "collision_margin", "use_margin",
+        "collision_collections", "mass", "friction", "restitution",
+        "linear_damping", "angular_damping", "use_deactivation",
+        "use_start_deactivated", "mmd_rigid_type", "mmd_shape", "mmd_bone",
+        "mmd_collision_group_number", "mmd_collision_group_mask", "collections"
+      ],
+      "properties": {
+        "object": {"type": "string", "minLength": 1},
+        "mmd_type": {"$ref": "#/$defs/nullableString"},
+        "hide_render": {"type": "boolean"},
+        "hide_viewport": {"type": "boolean"},
+        "blender_rigid_body_present": {"type": "boolean"},
+        "blender_type": {},
+        "kinematic": {"$ref": "#/$defs/nullableBoolean"},
+        "collision_shape": {},
+        "collision_margin": {"$ref": "#/$defs/nullableNumber"},
+        "use_margin": {"$ref": "#/$defs/nullableBoolean"},
+        "collision_collections": {},
+        "mass": {"$ref": "#/$defs/nullableNumber"},
+        "friction": {"$ref": "#/$defs/nullableNumber"},
+        "restitution": {"$ref": "#/$defs/nullableNumber"},
+        "linear_damping": {"$ref": "#/$defs/nullableNumber"},
+        "angular_damping": {"$ref": "#/$defs/nullableNumber"},
+        "use_deactivation": {"$ref": "#/$defs/nullableBoolean"},
+        "use_start_deactivated": {"$ref": "#/$defs/nullableBoolean"},
+        "mmd_rigid_type": {},
+        "mmd_shape": {},
+        "mmd_bone": {"$ref": "#/$defs/nullableString"},
+        "mmd_collision_group_number": {"$ref": "#/$defs/nullableInteger"},
+        "mmd_collision_group_mask": {},
+        "collections": {"type": "array", "items": {"type": "string"}}
+      },
+      "additionalProperties": false
+    },
+    "joint": {
+      "type": "object",
+      "required": [
+        "object", "mmd_type", "hide_render", "blender_constraint_present",
+        "constraint_type", "enabled", "disable_collisions", "object1", "object2",
+        "use_breaking", "breaking_threshold", "solver_iterations", "collections"
+      ],
+      "properties": {
+        "object": {"type": "string", "minLength": 1},
+        "mmd_type": {"$ref": "#/$defs/nullableString"},
+        "hide_render": {"type": "boolean"},
+        "blender_constraint_present": {"type": "boolean"},
+        "constraint_type": {},
+        "enabled": {"$ref": "#/$defs/nullableBoolean"},
+        "disable_collisions": {"$ref": "#/$defs/nullableBoolean"},
+        "object1": {"$ref": "#/$defs/nullableString"},
+        "object2": {"$ref": "#/$defs/nullableString"},
+        "use_breaking": {"$ref": "#/$defs/nullableBoolean"},
+        "breaking_threshold": {"$ref": "#/$defs/nullableNumber"},
+        "solver_iterations": {"$ref": "#/$defs/nullableInteger"},
+        "collections": {"type": "array", "items": {"type": "string"}}
+      },
+      "additionalProperties": false
+    },
+    "modifier": {
+      "type": "object",
+      "required": [
+        "object", "modifier", "type", "show_viewport", "show_render",
+        "point_cache", "settings"
+      ],
+      "properties": {
+        "object": {"type": "string", "minLength": 1},
+        "modifier": {"type": "string", "minLength": 1},
+        "type": {"enum": ["CLOTH", "COLLISION"]},
+        "show_viewport": {"type": "boolean"},
+        "show_render": {"type": "boolean"},
+        "point_cache": {"$ref": "#/$defs/pointCache"},
+        "settings": {"type": "object"}
+      },
+      "additionalProperties": false
+    },
+    "character": {
+      "type": "object",
+      "required": [
+        "character", "profile_cache_collection", "resolved_collection",
+        "armature_object", "object_count", "mesh_count", "visible_mesh_count",
+        "hidden_render_mesh_count", "rigid_body_count", "mmd_rigid_body_count",
+        "blender_rigid_body_count", "unbuilt_rigid_body_count",
+        "active_rigid_body_count", "passive_rigid_body_count",
+        "kinematic_rigid_body_count", "joint_count", "mmd_joint_count",
+        "blender_constraint_count", "broken_joint_reference_count",
+        "cloth_modifier_count", "collision_modifier_count", "physics_object_count",
+        "hidden_physics_object_count", "physics_collection_count",
+        "collision_group_count", "physics_built", "rigid_bodies", "joints",
+        "modifiers", "physics_collections", "collision_groups"
+      ],
+      "properties": {
+        "character": {"type": "string", "minLength": 1},
+        "profile_cache_collection": {"type": "string", "minLength": 1},
+        "resolved_collection": {"$ref": "#/$defs/nullableString"},
+        "armature_object": {"type": "string", "minLength": 1},
+        "object_count": {"type": "integer", "minimum": 0},
+        "mesh_count": {"type": "integer", "minimum": 0},
+        "visible_mesh_count": {"type": "integer", "minimum": 0},
+        "hidden_render_mesh_count": {"type": "integer", "minimum": 0},
+        "rigid_body_count": {"type": "integer", "minimum": 0},
+        "mmd_rigid_body_count": {"type": "integer", "minimum": 0},
+        "blender_rigid_body_count": {"type": "integer", "minimum": 0},
+        "unbuilt_rigid_body_count": {"type": "integer", "minimum": 0},
+        "active_rigid_body_count": {"type": "integer", "minimum": 0},
+        "passive_rigid_body_count": {"type": "integer", "minimum": 0},
+        "kinematic_rigid_body_count": {"type": "integer", "minimum": 0},
+        "joint_count": {"type": "integer", "minimum": 0},
+        "mmd_joint_count": {"type": "integer", "minimum": 0},
+        "blender_constraint_count": {"type": "integer", "minimum": 0},
+        "broken_joint_reference_count": {"type": "integer", "minimum": 0},
+        "cloth_modifier_count": {"type": "integer", "minimum": 0},
+        "collision_modifier_count": {"type": "integer", "minimum": 0},
+        "physics_object_count": {"type": "integer", "minimum": 0},
+        "hidden_physics_object_count": {"type": "integer", "minimum": 0},
+        "physics_collection_count": {"type": "integer", "minimum": 0},
+        "collision_group_count": {"type": "integer", "minimum": 0},
+        "physics_built": {"type": "boolean"},
+        "rigid_bodies": {"type": "array", "items": {"$ref": "#/$defs/rigidBody"}},
+        "joints": {"type": "array", "items": {"$ref": "#/$defs/joint"}},
+        "modifiers": {"type": "array", "items": {"$ref": "#/$defs/modifier"}},
+        "physics_collections": {"type": "array", "items": {"type": "string"}},
+        "collision_groups": {"type": "array", "items": {"type": "string"}}
+      },
+      "additionalProperties": false
+    },
+    "summary": {
+      "type": "object",
+      "required": [
+        "character_count", "object_count", "mesh_count", "visible_mesh_count",
+        "hidden_render_mesh_count", "rigid_body_count", "mmd_rigid_body_count",
+        "blender_rigid_body_count", "unbuilt_rigid_body_count",
+        "active_rigid_body_count", "passive_rigid_body_count",
+        "kinematic_rigid_body_count", "joint_count", "mmd_joint_count",
+        "blender_constraint_count", "broken_joint_reference_count",
+        "cloth_modifier_count", "collision_modifier_count", "physics_object_count",
+        "hidden_physics_object_count", "physics_collection_count",
+        "collision_group_count", "issue_count", "warning_count"
+      ],
+      "properties": {
+        "character_count": {"type": "integer", "minimum": 1},
+        "object_count": {"type": "integer", "minimum": 0},
+        "mesh_count": {"type": "integer", "minimum": 0},
+        "visible_mesh_count": {"type": "integer", "minimum": 0},
+        "hidden_render_mesh_count": {"type": "integer", "minimum": 0},
+        "rigid_body_count": {"type": "integer", "minimum": 0},
+        "mmd_rigid_body_count": {"type": "integer", "minimum": 0},
+        "blender_rigid_body_count": {"type": "integer", "minimum": 0},
+        "unbuilt_rigid_body_count": {"type": "integer", "minimum": 0},
+        "active_rigid_body_count": {"type": "integer", "minimum": 0},
+        "passive_rigid_body_count": {"type": "integer", "minimum": 0},
+        "kinematic_rigid_body_count": {"type": "integer", "minimum": 0},
+        "joint_count": {"type": "integer", "minimum": 0},
+        "mmd_joint_count": {"type": "integer", "minimum": 0},
+        "blender_constraint_count": {"type": "integer", "minimum": 0},
+        "broken_joint_reference_count": {"type": "integer", "minimum": 0},
+        "cloth_modifier_count": {"type": "integer", "minimum": 0},
+        "collision_modifier_count": {"type": "integer", "minimum": 0},
+        "physics_object_count": {"type": "integer", "minimum": 0},
+        "hidden_physics_object_count": {"type": "integer", "minimum": 0},
+        "physics_collection_count": {"type": "integer", "minimum": 0},
+        "collision_group_count": {"type": "integer", "minimum": 0},
+        "issue_count": {"type": "integer", "minimum": 0},
+        "warning_count": {"type": "integer", "minimum": 0}
+      },
+      "additionalProperties": false
+    }
+  }
+}

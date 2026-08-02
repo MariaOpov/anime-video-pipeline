@@ -25,7 +25,9 @@ class Phase3Tests(unittest.TestCase):
             self._write_fixture(project)
             manifest = Phase3Planner(self._config(project), self.schemas).build()
             self.assertEqual(manifest["frame_end"], 48)
-            self.assertEqual(manifest["version"], 6)
+            self.assertEqual(manifest["version"], 7)
+            self.assertFalse(manifest["physics"]["enabled"])
+            self.assertEqual(manifest["physics"]["simulation_frame_start"], -35)
             self.assertEqual(manifest["summary"], {
                 "shot_count": 1, "dialogue_count": 1, "mouth_cue_count": 2,
                 "performance_clip_count": 0, "gesture_count": 0,
