@@ -52,7 +52,7 @@ phase3:
   base_scene: blender_scenes/demo_mannequins.blend
   output_scene: blender_scenes/phase3_assembled.blend
   preview_video: renders/phase3_preview.mp4
-  resolution_percentage: 50
+  resolution_percentage: 100
   camera:
     close_up_distance: 4.2
     medium_distance: 6.4
@@ -141,3 +141,21 @@ characters:
 motion_fallbacks:
   sad_talking: [idle_talking, idle]
   surprised_talking: [surprised, idle_talking, idle]
+
+phase8_1:
+  enabled: true
+  report: generated/phase8_1_physics_report.json
+  warmup_frames: 36
+  rigid_body_collection: PIPE_Phase8_1_RigidBodies
+  constraint_collection: PIPE_Phase8_1_Constraints
+  substeps_per_frame: 10
+  solver_iterations: 10
+
+  collider_overrides:
+    Ren:
+      - object: "017_右手首"
+        radial_scale: 1.15
+        length_scale: 1.05
+      - object: "021_左手首"
+        radial_scale: 1.15
+        length_scale: 1.05

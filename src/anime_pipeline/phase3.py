@@ -13,6 +13,7 @@ from .direction import direct_performance
 from .harmonization import build_harmonization_contract
 from .io_utils import atomic_write_json, load_json, validate
 from .motion_ai import validate_motion_intent
+from .physics_runtime import build_physics_contract
 
 
 def seconds_to_frame(seconds: float, fps: int) -> int:
@@ -124,10 +125,16 @@ class Phase3Planner:
         total_seconds = max(float(shot_list.get("total_duration_seconds", 0)),
                             float(timeline.get("total_duration_seconds", 0)))
         output = self.config.data["output"]
+        frame_end = max(1, math.ceil(total_seconds * self.config.fps))
+        physics = build_physics_contract(
+            self.config.data.get("phase8_1", {}),
+            frame_start=1,
+            frame_end=frame_end,
+        )
         manifest = {
-            "version": 6, "project_name": self.config.data["project_name"],
+            "version": 7, "project_name": self.config.data["project_name"],
             "fps": self.config.fps, "frame_start": 1,
-            "frame_end": max(1, math.ceil(total_seconds * self.config.fps)),
+            "frame_end": frame_end,
             "base_scene": base_scene.relative_to(self.config.project_dir).as_posix(),
             "output_scene": output_scene.relative_to(self.config.project_dir).as_posix(),
             "preview_video": preview_video.relative_to(self.config.project_dir).as_posix(),
@@ -138,7 +145,7 @@ class Phase3Planner:
             },
             "camera": self.settings.get("camera", {}), "performance": performance,
             "blocking": blocking, "character_assets": character_assets,
-            "harmonization": harmonization,
+            "harmonization": harmonization, "physics": physics,
             "shots": shots, "dialogue": dialogue,
             "summary": {"shot_count": len(shots), "dialogue_count": len(dialogue),
                         "mouth_cue_count": cue_total,

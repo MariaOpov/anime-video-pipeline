@@ -422,11 +422,21 @@ class Phase5Tests(unittest.TestCase):
             "duration_seconds": 1.0, "mouth_cues": cues,
         })
         manifest = {
-            "version": 6, "project_name": "Phase 5 Test", "fps": 24, "frame_start": 1, "frame_end": 48,
+            "version": 7, "project_name": "Phase 5 Test", "fps": 24, "frame_start": 1, "frame_end": 48,
             "base_scene": "blender_scenes/base.blend", "output_scene": "blender_scenes/assembled.blend",
             "preview_video": "renders/preview.mp4",
             "render": {"engine": "BLENDER_EEVEE", "width": 1280, "height": 720, "resolution_percentage": 50},
             "camera": {},
+            "physics": {
+                "version": 1, "enabled": False,
+                "report": "generated/phase8_1_physics_report.json",
+                "render_frame_start": 1, "render_frame_end": 48,
+                "warmup_frames": 36, "simulation_frame_start": -35,
+                "simulation_frame_end": 48,
+                "rigid_body_collection": "PIPE_Phase8_1_RigidBodies",
+                "constraint_collection": "PIPE_Phase8_1_Constraints",
+                "substeps_per_frame": 10, "solver_iterations": 10,
+            },
             "performance": {"enabled": True, "source": None,
                             "amplitude_scale": 1.0, "clips": [],
                             "gaze_events": [], "blink_events": [],

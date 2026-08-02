@@ -212,6 +212,77 @@
     "motion_fallbacks": {
       "type": "object",
       "additionalProperties": {"type": "array", "items": {"type": "string"}}
+    },
+    "phase8_1": {
+      "type": "object",
+      "required": [
+        "enabled",
+        "report"
+      ],
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "report": {
+          "type": "string",
+          "minLength": 1
+        },
+        "warmup_frames": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 240
+        },
+        "rigid_body_collection": {
+          "type": "string",
+          "minLength": 1
+        },
+        "constraint_collection": {
+          "type": "string",
+          "minLength": 1
+        },
+        "substeps_per_frame": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        },
+        "solver_iterations": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000
+        },
+        "collider_overrides": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "object",
+                "radial_scale",
+                "length_scale"
+              ],
+              "properties": {
+                "object": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "radial_scale": {
+                  "type": "number",
+                  "minimum": 1.0,
+                  "maximum": 2.0
+                },
+                "length_scale": {
+                  "type": "number",
+                  "minimum": 1.0,
+                  "maximum": 2.0
+                }
+              },
+              "additionalProperties": false
+            }
+          }
+        }
+      },
+      "additionalProperties": false
     }
   },
   "additionalProperties": true

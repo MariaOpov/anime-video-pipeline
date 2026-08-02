@@ -1,9 +1,9 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "type": "object",
-  "required": ["version", "project_name", "fps", "frame_start", "frame_end", "base_scene", "output_scene", "preview_video", "render", "camera", "performance", "blocking", "character_assets", "harmonization", "shots", "dialogue", "summary"],
+  "required": ["version", "project_name", "fps", "frame_start", "frame_end", "base_scene", "output_scene", "preview_video", "render", "camera", "performance", "blocking", "character_assets", "harmonization", "physics", "shots", "dialogue", "summary"],
   "properties": {
-    "version": {"const": 6},
+    "version": {"const": 7},
     "project_name": {"type": "string", "minLength": 1},
     "fps": {"type": "integer", "minimum": 1},
     "frame_start": {"type": "integer", "minimum": 1},
@@ -326,6 +326,106 @@
         "harmonization_ready_count": {"type": "integer", "minimum": 0},
         "adaptive_camera_shot_count": {"type": "integer", "minimum": 0}
       }, "additionalProperties": false
+    },
+    "physics": {
+      "type": "object",
+      "required": [
+        "version",
+        "enabled",
+        "report",
+        "render_frame_start",
+        "render_frame_end",
+        "warmup_frames",
+        "simulation_frame_start",
+        "simulation_frame_end",
+        "rigid_body_collection",
+        "constraint_collection",
+        "substeps_per_frame",
+        "solver_iterations"
+      ],
+      "properties": {
+        "version": {
+          "const": 1
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "report": {
+          "type": "string",
+          "minLength": 1
+        },
+        "render_frame_start": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "render_frame_end": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "warmup_frames": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 240
+        },
+        "simulation_frame_start": {
+          "type": "integer",
+          "minimum": -10000
+        },
+        "simulation_frame_end": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "rigid_body_collection": {
+          "type": "string",
+          "minLength": 1
+        },
+        "constraint_collection": {
+          "type": "string",
+          "minLength": 1
+        },
+        "substeps_per_frame": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        },
+        "solver_iterations": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000
+        },
+        "collider_overrides": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "object",
+                "radial_scale",
+                "length_scale"
+              ],
+              "properties": {
+                "object": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "radial_scale": {
+                  "type": "number",
+                  "minimum": 1.0,
+                  "maximum": 2.0
+                },
+                "length_scale": {
+                  "type": "number",
+                  "minimum": 1.0,
+                  "maximum": 2.0
+                }
+              },
+              "additionalProperties": false
+            }
+          }
+        }
+      },
+      "additionalProperties": false
     }
   },
   "additionalProperties": false,

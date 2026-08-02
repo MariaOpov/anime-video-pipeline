@@ -117,17 +117,43 @@ def _semantic_delta_quaternion(bone, rotation):
     return rest.inverted() @ semantic @ rest
 
 
+def _gaze_anchor_world(armature) -> Vector:
+    head = pose_bone_for(armature, "head")
+    if head:
+        local_point = (head.head + head.tail) * 0.5
+        return armature.matrix_world @ local_point
+    return armature.matrix_world.translation.copy()
+
+
 def look_direction(armature, target_name: str | None) -> float:
     if not target_name:
         return 0.0
+
     try:
         target = armature_for(target_name)
     except RuntimeError:
         return 0.0
-    delta = target.matrix_world.translation.x - armature.matrix_world.translation.x
-    if abs(delta) < 0.001:
+
+    source_position = _gaze_anchor_world(armature)
+    target_position = _gaze_anchor_world(target)
+    world_delta = target_position - source_position
+
+    if world_delta.length <= 0.001:
         return 0.0
-    return 1.0 if delta > 0 else -1.0
+
+    # Resolve left/right relative to the looking character rather than
+    # relying on global scene X. This respects blocking/root rotation.
+    local_delta = (
+        armature.matrix_world
+        .to_3x3()
+        .inverted_safe()
+        @ world_delta
+    )
+
+    if abs(local_delta.x) < 0.001:
+        return 0.0
+
+    return 1.0 if local_delta.x > 0.0 else -1.0
 
 
 def animate_performances(manifest: dict) -> tuple[int, int, int, int, int]:
@@ -246,35 +272,104 @@ def animate_gaze(manifest: dict) -> tuple[int, int]:
     events = manifest.get("performance", {}).get("gaze_events", [])
     applied = 0
     inserted = 0
-    for event in events:
-        armature = armature_for(event["character"])
-        direction = look_direction(armature, event["target"])
-        if not direction:
-            continue
-        start, end = int(event["start_frame"]), int(event["end_frame"])
-        transition = max(2, min(5, (end - start) // 5))
-        eye_bone = pose_bone_for(armature, "eyes")
-        if eye_bone:
-            eye_bone.rotation_mode = "XYZ"
-            for frame, value in ((start, 0.0), (min(end, start + transition), direction * 0.09),
-                                 (max(start, end - transition), direction * 0.09), (end, 0.0)):
-                eye_bone.rotation_euler.z = value
-                eye_bone.keyframe_insert(data_path="rotation_euler", index=2, frame=frame,
-                                         group="PIPE_Gaze")
-                inserted += 1
+
+    scene = bpy.context.scene
+    original_frame = int(scene.frame_current)
+
+    try:
+        for event in events:
+            start = int(event["start_frame"])
+            end = int(event["end_frame"])
+            sample_frame = max(
+                start,
+                min(end, (start + end) // 2),
+            )
+
+            # Blocking is stored on character root objects. Evaluate the
+            # event frame before reading world-space armature/head positions.
+            scene.frame_set(sample_frame)
+            bpy.context.view_layer.update()
+
+            armature = armature_for(event["character"])
+            direction = look_direction(
+                armature,
+                event["target"],
+            )
+
+            if not direction:
+                continue
+
+            transition = max(
+                2,
+                min(5, (end - start) // 5),
+            )
+
+            eye_bone = pose_bone_for(
+                armature,
+                "eyes",
+            )
+
+            if eye_bone:
+                eye_bone.rotation_mode = "XYZ"
+
+                for frame, value in (
+                    (start, 0.0),
+                    (
+                        min(end, start + transition),
+                        direction * 0.09,
+                    ),
+                    (
+                        max(start, end - transition),
+                        direction * 0.09,
+                    ),
+                    (end, 0.0),
+                ):
+                    eye_bone.rotation_euler.z = value
+                    eye_bone.keyframe_insert(
+                        data_path="rotation_euler",
+                        index=2,
+                        frame=frame,
+                        group="PIPE_Gaze",
+                    )
+                    inserted += 1
+
+                applied += 1
+                continue
+
+            eyes = eye_objects_for(
+                event["character"]
+            )
+
+            if not eyes:
+                continue
+
+            for eye in eyes:
+                for frame, value in (
+                    (start, 0.0),
+                    (
+                        min(end, start + transition),
+                        direction * 0.018,
+                    ),
+                    (
+                        max(start, end - transition),
+                        direction * 0.018,
+                    ),
+                    (end, 0.0),
+                ):
+                    eye.delta_location.x = value
+                    eye.keyframe_insert(
+                        data_path="delta_location",
+                        index=0,
+                        frame=frame,
+                        group="PIPE_Gaze",
+                    )
+                    inserted += 1
+
             applied += 1
-            continue
-        eyes = eye_objects_for(event["character"])
-        if not eyes:
-            continue
-        for eye in eyes:
-            for frame, value in ((start, 0.0), (min(end, start + transition), direction * 0.018),
-                                 (max(start, end - transition), direction * 0.018), (end, 0.0)):
-                eye.delta_location.x = value
-                eye.keyframe_insert(data_path="delta_location", index=0, frame=frame,
-                                    group="PIPE_Gaze")
-                inserted += 1
-        applied += 1
+    finally:
+        scene.frame_set(original_frame)
+        bpy.context.view_layer.update()
+
     return applied, inserted
 
 
@@ -1250,6 +1345,263 @@ def write_phase8_report(project: Path, manifest: dict, characters: list[dict],
     return report_path
 
 
+
+def _ensure_direct_scene_collection(name: str):
+    scene = bpy.context.scene
+    collection = bpy.data.collections.get(name)
+    if collection is None:
+        collection = bpy.data.collections.new(name)
+    if scene.collection.children.get(collection.name) is None:
+        scene.collection.children.link(collection)
+    return collection
+
+
+def _replace_collection_members(collection, objects) -> None:
+    expected = set(objects)
+    for obj in list(collection.objects):
+        if obj not in expected:
+            collection.objects.unlink(obj)
+    for obj in expected:
+        if collection not in obj.users_collection:
+            collection.objects.link(obj)
+
+
+def _character_collection_name(character: str) -> str:
+    token = "_".join(str(character).strip().upper().split())
+    return f"PIPE_CHARACTER_{token}"
+
+
+def _vector_values(value) -> list[float]:
+    return [round(float(component), 6) for component in value]
+
+
+def _find_character_collider(character: str, object_name: str):
+    collection_name = _character_collection_name(character)
+    collection = bpy.data.collections.get(collection_name)
+    if collection is None:
+        return None, collection_name, (
+            f"Collider override character collection does not exist: "
+            f"{collection_name}"
+        )
+
+    candidates = [
+        obj for obj in collection.all_objects
+        if obj.name == object_name or obj.name.endswith(object_name)
+    ]
+    if len(candidates) != 1:
+        return None, collection_name, (
+            f"Collider override {character}/{object_name} resolved "
+            f"{len(candidates)} object(s) in {collection_name}"
+        )
+
+    obj = candidates[0]
+    if obj.rigid_body is None:
+        return None, collection_name, (
+            f"Collider override target has no Blender rigid body: {obj.name}"
+        )
+    return obj, collection_name, None
+
+
+def _apply_collider_overrides(settings: dict) -> tuple[list[dict], list[str]]:
+    configured = settings.get("collider_overrides", {})
+    if not configured:
+        return [], []
+
+    results = []
+    issues = []
+    base_scale_key = "pipe_phase8_1_base_scale"
+
+    for character, entries in configured.items():
+        for entry in entries:
+            object_name = str(entry["object"])
+            radial_scale = float(entry["radial_scale"])
+            length_scale = float(entry["length_scale"])
+            obj, collection_name, issue = _find_character_collider(
+                str(character), object_name
+            )
+            if issue:
+                issues.append(issue)
+                continue
+
+            stored_base_scale = obj.get(base_scale_key)
+            try:
+                base_scale = [
+                    float(stored_base_scale[index]) for index in range(3)
+                ]
+            except (TypeError, IndexError, KeyError):
+                base_scale = [float(component) for component in obj.scale]
+                obj[base_scale_key] = base_scale
+
+            # Reset to the stored base before applying configured multipliers.
+            # Repeated calls are therefore idempotent instead of compounding scale.
+            obj.scale = tuple(base_scale)
+            bpy.context.view_layer.update()
+            base_dimensions = _vector_values(obj.dimensions)
+
+            applied_scale = [
+                base_scale[0] * radial_scale,
+                base_scale[1] * radial_scale,
+                base_scale[2] * length_scale,
+            ]
+            obj.scale = tuple(applied_scale)
+            obj["pipe_phase8_1_override_character"] = str(character)
+            obj["pipe_phase8_1_radial_scale"] = radial_scale
+            obj["pipe_phase8_1_length_scale"] = length_scale
+            bpy.context.view_layer.update()
+
+            results.append({
+                "character": str(character),
+                "collection": collection_name,
+                "object": obj.name,
+                "collision_shape": obj.rigid_body.collision_shape,
+                "kinematic": bool(obj.rigid_body.kinematic),
+                "radial_scale": radial_scale,
+                "length_scale": length_scale,
+                "base_scale": _vector_values(base_scale),
+                "applied_scale": _vector_values(applied_scale),
+                "base_dimensions": base_dimensions,
+                "applied_dimensions": _vector_values(obj.dimensions),
+            })
+
+    return results, issues
+
+
+def configure_character_physics(project: Path, manifest: dict) -> tuple[dict, Path]:
+    settings = manifest.get("physics", {})
+    enabled = bool(settings.get("enabled", False))
+    render_start = int(manifest["frame_start"])
+    render_end = int(manifest["frame_end"])
+    simulation_start = int(settings.get("simulation_frame_start", render_start))
+    simulation_end = int(settings.get("simulation_frame_end", render_end))
+    warmup_frames = int(settings.get("warmup_frames", 0))
+    report_path = (project / settings.get(
+        "report", "generated/phase8_1_physics_report.json"
+    )).resolve()
+    try:
+        report_path.relative_to(project.resolve())
+    except ValueError as exc:
+        raise RuntimeError("Phase 8.1 report path escaped the project directory") from exc
+
+    scene = bpy.context.scene
+    bodies = sorted(
+        (obj for obj in bpy.data.objects if obj.rigid_body is not None),
+        key=lambda obj: obj.name,
+    )
+    constraints = sorted(
+        (obj for obj in bpy.data.objects if obj.rigid_body_constraint is not None),
+        key=lambda obj: obj.name,
+    )
+    issues = []
+    evaluated = 0
+    collider_override_results = []
+
+    if enabled:
+        if not bodies:
+            issues.append("No Blender rigid bodies are available in the assembled scene")
+        if not constraints:
+            issues.append("No Blender rigid-body constraints are available in the assembled scene")
+
+        collider_override_results, collider_override_issues = (
+            _apply_collider_overrides(settings)
+        )
+        issues.extend(collider_override_issues)
+
+        body_collection = _ensure_direct_scene_collection(
+            str(settings["rigid_body_collection"])
+        )
+        constraint_collection = _ensure_direct_scene_collection(
+            str(settings["constraint_collection"])
+        )
+        _replace_collection_members(body_collection, bodies)
+        _replace_collection_members(constraint_collection, constraints)
+
+        if scene.rigidbody_world is None:
+            with bpy.context.temp_override(scene=scene):
+                if not bpy.ops.rigidbody.world_add.poll():
+                    raise RuntimeError(
+                        "Rigid Body World is missing and bpy.ops.rigidbody.world_add cannot run"
+                    )
+                result = bpy.ops.rigidbody.world_add()
+            if "FINISHED" not in result:
+                raise RuntimeError(f"Could not create Rigid Body World: {sorted(result)}")
+
+        world = scene.rigidbody_world
+        if world is None:
+            raise RuntimeError("Rigid Body World creation completed without a world")
+        world.collection = body_collection
+        world.constraints = constraint_collection
+        world.enabled = True
+        world.substeps_per_frame = int(settings["substeps_per_frame"])
+        world.solver_iterations = int(settings["solver_iterations"])
+        cache = world.point_cache
+        if cache.is_baked:
+            raise RuntimeError(
+                "Phase 8.1 refuses to replace an already baked rigid-body cache"
+            )
+        cache.frame_start = simulation_start
+        cache.frame_end = simulation_end
+
+        depsgraph = bpy.context.evaluated_depsgraph_get()
+        for frame in range(simulation_start, render_start + 1):
+            scene.frame_set(frame)
+            depsgraph.update()
+            evaluated += 1
+        scene.frame_set(render_start)
+        depsgraph.update()
+    else:
+        world = scene.rigidbody_world
+        body_collection = world.collection if world else None
+        constraint_collection = world.constraints if world else None
+        cache = world.point_cache if world else None
+
+    world = scene.rigidbody_world
+    cache = world.point_cache if world else None
+    timing_preserved = scene.frame_start == render_start and scene.frame_end == render_end
+    if enabled and not timing_preserved:
+        issues.append("Render frame range changed while preparing physics warm-up")
+    if enabled and (world is None or not world.enabled):
+        issues.append("Rigid Body World is not enabled after integration")
+    if enabled and evaluated != warmup_frames + 1:
+        issues.append("Warm-up evaluation did not cover every expected frame")
+
+    report = {
+        "schema_version": 1,
+        "phase": "8.1",
+        "status": "skipped" if not enabled else "complete" if not issues else "failed",
+        "enabled": enabled,
+        "project_name": manifest["project_name"],
+        "render_frame_start": render_start,
+        "render_frame_end": render_end,
+        "simulation_frame_start": simulation_start,
+        "simulation_frame_end": simulation_end,
+        "warmup_frames": warmup_frames,
+        "warmup_evaluated_frame_count": evaluated,
+        "render_timing_preserved": timing_preserved,
+        "rigid_body_world_present": world is not None,
+        "rigid_body_world_enabled": bool(world and world.enabled),
+        "rigid_body_collection": world.collection.name if world and world.collection else None,
+        "constraint_collection": world.constraints.name if world and world.constraints else None,
+        "rigid_body_count": len(bodies),
+        "constraint_count": len(constraints),
+        "hidden_render_rigid_body_count": sum(obj.hide_render for obj in bodies),
+        "substeps_per_frame": int(world.substeps_per_frame) if world else None,
+        "solver_iterations": int(world.solver_iterations) if world else None,
+        "cache_frame_start": int(cache.frame_start) if cache else None,
+        "cache_frame_end": int(cache.frame_end) if cache else None,
+        "cache_is_baked": bool(cache.is_baked) if cache else None,
+        "cache_is_outdated": bool(cache.is_outdated) if cache else None,
+        "collider_override_count": len(collider_override_results),
+        "collider_overrides": collider_override_results,
+        "issues": issues,
+    }
+    atomic_write_json(report_path, report)
+    if issues:
+        raise RuntimeError(
+            f"Phase 8.1 physics integration failed with {len(issues)} issue(s); "
+            f"see {report_path}"
+        )
+    return report, report_path
+
 def main() -> None:
     args = arguments()
     project = args.project.resolve()
@@ -1269,6 +1621,7 @@ def main() -> None:
     blink_targets, blink_events, blink_keyframes = animate_blinks(manifest)
     mouth_targets, mouth_cues = animate_dialogue(manifest)
     camera_count, camera_movements, camera_keyframes, camera_audits = assemble_cameras(manifest)
+    physics_runtime, physics_report = configure_character_physics(project, manifest)
     direction = manifest.get("performance", {})
     blocking = manifest.get("blocking", {})
 
@@ -1339,11 +1692,16 @@ def main() -> None:
         f"{resolved_character_bones} resolved bones/{resolved_character_mouth_morphs} mouth morphs, "
         f"{character_texture_missing} missing character textures, "
         f"{len(harmonization_results)} harmonized character(s)/{phase8_issues} Phase 8 issues, "
+        f"{physics_runtime['rigid_body_count']} rigid bodies/"
+        f"{physics_runtime['constraint_count']} constraints, "
+        f"warmup={physics_runtime['simulation_frame_start']}.."
+        f"{physics_runtime['render_frame_start']}, "
         f"{actual_framing_risks} framing risks, "
         f"{blocking.get('camera_collision_risk_count', 0)} camera collision risks, "
         f"{skipped_bones} skipped aliases, scene={output_scene}, "
         f"preview={preview if args.render else 'not rendered'}, "
-        f"phase8_report={phase8_report}, report={report}"
+        f"phase8_report={phase8_report}, phase8_1_report={physics_report}, "
+        f"report={report}"
     )
 
 
