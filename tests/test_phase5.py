@@ -29,7 +29,7 @@ class Phase5Tests(unittest.TestCase):
             )
             self.assertEqual(report["status"], "complete")
             self.assertEqual(report["summary"]["failed_gate_count"], 0)
-            self.assertEqual(report["summary"]["quality_gate_count"], 31)
+            self.assertEqual(report["summary"]["quality_gate_count"], 34)
             self.assertEqual(report["summary"]["mouth_cue_count"], 2)
             self.assertTrue(output.is_file())
             self.assertIn("final_video", [item["name"] for item in report["artifacts"]])
@@ -264,6 +264,87 @@ class Phase5Tests(unittest.TestCase):
                         if item["name"] == "production_character_assets_ready")
             self.assertEqual(gate["status"], "passed")
 
+    def test_phase8_gate_blocks_non_grounded_character(self):
+        with tempfile.TemporaryDirectory() as directory:
+            project = Path(directory)
+            self._write_fixture(project)
+            manifest_path = project / "generated" / "phase3_manifest.json"
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            manifest["harmonization"].update({
+                "enabled": True,
+                "characters": [{
+                    "character": "Aiko", "source": "base_scene",
+                    "source_height_meters": 1.72, "target_height_meters": 1.68,
+                    "planned_scale_factor": 0.976744,
+                    "source_dimensions": [0.62, 0.38, 1.72],
+                    "target_dimensions": [0.60558, 0.37116, 1.68],
+                    "head_height_meters": 1.5456,
+                    "canonical_controls": {"root": "__PIPE_ROOT__"},
+                    "required_control_count": 10, "resolved_control_count": 10,
+                    "fallback_control_count": 3, "runtime_probe_required": True,
+                    "ready": True,
+                }],
+                "configured_count": 1, "ready_count": 1,
+            })
+            manifest["summary"].update({
+                "harmonization_character_count": 1,
+                "harmonization_ready_count": 1,
+                "adaptive_camera_shot_count": 1,
+            })
+            atomic_write_json(manifest_path, manifest)
+            scene_path = project / "generated" / "phase3_scene_report.json"
+            scene = json.loads(scene_path.read_text(encoding="utf-8"))
+            scene.update({
+                "harmonization_enabled": True, "harmonization_character_count": 1,
+                "harmonization_ready_count": 1, "neutral_pose_character_count": 1,
+                "grounded_character_count": 0, "bone_axes_verified_count": 1,
+                "adaptive_camera_shot_count": 1, "adaptive_camera_pass_count": 1,
+                "phase8_issue_count": 1,
+            })
+            atomic_write_json(scene_path, scene)
+            report_path = project / "generated" / "phase8_harmonization_report.json"
+            phase8 = {
+                "schema_version": 1, "phase": 8, "status": "failed", "enabled": True,
+                "project_name": "Phase 5 Test", "frame_start": 1, "frame_end": 48,
+                "pose": "neutral_dialogue",
+                "characters": [{
+                    "character": "Aiko", "root_object": "PIPE_Aiko_ROOT",
+                    "target_height_meters": 1.68, "measured_height_meters": 1.68,
+                    "height_error_ratio": 0.0, "scale_factor": 0.976744,
+                    "world_bounds_min": [-0.3, -0.2, 0.04],
+                    "world_bounds_max": [0.3, 0.2, 1.72],
+                    "neutral_pose": "neutral_dialogue", "arm_deviation_degrees": 0.1,
+                    "neutral_pose_passed": True, "ground_plane_z": 0.0,
+                    "ground_error_meters": 0.04, "grounding_passed": False,
+                    "foot_lock_mode": "root_grounded", "bone_axes_verified": True,
+                    "required_control_count": 10, "resolved_control_count": 10,
+                    "ready": False,
+                }],
+                "shots": [{
+                    "scene_id": "scene_001", "shot_id": "scene_001_shot_001",
+                    "composition": "single", "subject": "Aiko",
+                    "required_characters": ["Aiko"], "required_region": "full_body",
+                    "world_bounds_min": [-0.3, -0.2, -0.06],
+                    "world_bounds_max": [0.3, 0.2, 1.78], "lens_mm": 56,
+                    "frame_margin_fraction": 0.06, "measured_minimum_margin": 0.061,
+                    "head_visible": True, "feet_required": True, "feet_visible": True,
+                    "framing_passed": True,
+                }],
+                "summary": {
+                    "character_count": 1, "ready_character_count": 0,
+                    "neutral_pose_character_count": 1, "scaled_character_count": 1,
+                    "grounded_character_count": 0, "bone_axes_verified_count": 1,
+                    "source_ik_character_count": 0, "root_grounded_character_count": 1,
+                    "adaptive_camera_shot_count": 1, "framing_passed_shot_count": 1,
+                    "issue_count": 1,
+                },
+            }
+            atomic_write_json(report_path, phase8)
+            with self.assertRaisesRegex(QualityGateError, "character_harmonization_ready"):
+                Phase5Auditor(self._config(project), self.schemas).run(
+                    tool_versions=self.tool_versions
+                )
+
     def test_embeds_stage_run_record(self):
         with tempfile.TemporaryDirectory() as directory:
             project = Path(directory)
@@ -341,7 +422,7 @@ class Phase5Tests(unittest.TestCase):
             "duration_seconds": 1.0, "mouth_cues": cues,
         })
         manifest = {
-            "version": 5, "project_name": "Phase 5 Test", "fps": 24, "frame_start": 1, "frame_end": 48,
+            "version": 6, "project_name": "Phase 5 Test", "fps": 24, "frame_start": 1, "frame_end": 48,
             "base_scene": "blender_scenes/base.blend", "output_scene": "blender_scenes/assembled.blend",
             "preview_video": "renders/preview.mp4",
             "render": {"engine": "BLENDER_EEVEE", "width": 1280, "height": 720, "resolution_percentage": 50},
@@ -359,6 +440,17 @@ class Phase5Tests(unittest.TestCase):
                                  "configured_count": 0, "ready_count": 0,
                                  "missing_texture_count": 0, "warning_count": 0,
                                  "license_warning_count": 0},
+            "harmonization": {
+                "version": 1, "enabled": False,
+                "report": "generated/phase8_harmonization_report.json",
+                "pose": "neutral_dialogue",
+                "floor_z": 0.0, "default_target_height_meters": 1.72,
+                "height_tolerance_ratio": 0.02, "ground_tolerance_meters": 0.015,
+                "rest_pose_max_degrees": 18.0, "neutral_arm_degrees": 12.0,
+                "safe_frame_fraction": 0.88, "headroom_fraction": 0.06,
+                "footroom_fraction": 0.04, "characters": [],
+                "configured_count": 0, "ready_count": 0,
+            },
             "shots": [{"scene_id": "scene_001", "shot_id": "scene_001_shot_001", "start_frame": 1,
                        "end_frame": 48, "shot_type": "medium", "movement": "static", "target": "Aiko"}],
             "dialogue": [{"line_id": "line_001", "shot_id": "scene_001_shot_001", "character": "Aiko",
@@ -377,7 +469,10 @@ class Phase5Tests(unittest.TestCase):
                         "character_asset_ready_count": 0,
                         "character_texture_missing_count": 0,
                         "character_asset_warning_count": 0,
-                        "character_license_warning_count": 0},
+                        "character_license_warning_count": 0,
+                        "harmonization_character_count": 0,
+                        "harmonization_ready_count": 0,
+                        "adaptive_camera_shot_count": 0},
         }
         atomic_write_json(project / "generated" / "phase3_manifest.json", manifest)
         (project / "blender_scenes" / "assembled.blend").write_bytes(b"BLENDER" * 32)
@@ -403,7 +498,30 @@ class Phase5Tests(unittest.TestCase):
             "resolved_character_mouth_morph_count": 0,
             "character_texture_missing_count": 0,
             "character_license_warning_count": 0,
+            "harmonization_enabled": False,
+            "harmonization_character_count": 0,
+            "harmonization_ready_count": 0,
+            "neutral_pose_character_count": 0,
+            "grounded_character_count": 0,
+            "bone_axes_verified_count": 0,
+            "adaptive_camera_shot_count": 0,
+            "adaptive_camera_pass_count": 0,
+            "phase8_issue_count": 0,
+            "phase8_report": "generated/phase8_harmonization_report.json",
             "preview_video": "renders/preview.mp4",
+        })
+        atomic_write_json(project / "generated" / "phase8_harmonization_report.json", {
+            "schema_version": 1, "phase": 8, "status": "skipped", "enabled": False,
+            "project_name": "Phase 5 Test", "frame_start": 1, "frame_end": 48,
+            "pose": "neutral_dialogue", "characters": [], "shots": [],
+            "summary": {
+                "character_count": 0, "ready_character_count": 0,
+                "neutral_pose_character_count": 0, "scaled_character_count": 0,
+                "grounded_character_count": 0, "bone_axes_verified_count": 0,
+                "source_ik_character_count": 0, "root_grounded_character_count": 0,
+                "adaptive_camera_shot_count": 0, "framing_passed_shot_count": 0,
+                "issue_count": 0,
+            },
         })
         (project / "subtitles" / "dialogue.srt").write_text("1\n00:00:00,000 --> 00:00:01,000\nXin chào\n", encoding="utf-8")
         (project / "output" / "final.mp4").write_bytes(b"FINAL" * 64)

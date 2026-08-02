@@ -10,16 +10,24 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import os
 import sys
 from pathlib import Path
 
 import bpy
-from mathutils import Matrix, Vector
+from bpy_extras.object_utils import world_to_camera_view
+from mathutils import Euler, Matrix, Vector
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
 from anime_pipeline.gestures import build_pose_keyframes  # noqa: E402
+from anime_pipeline.harmonization import camera_fit_distance  # noqa: E402
+from anime_pipeline.rig_contract import (  # noqa: E402
+    BONE_ALIASES,
+    PHASE8_REQUIRED_CONTROLS,
+    match_aliases,
+)
 
 
 MOUTH_SHAPES = {
@@ -28,15 +36,7 @@ MOUTH_SHAPES = {
     "E": (1.30, 0.68), "O": (0.72, 1.22),
 }
 
-POSE_BONE_ALIASES = {
-    "spine": ("spine", "upper_body", "上半身", "上半身2"),
-    "head": ("head", "頭"),
-    "arm.L": ("arm.L", "upper_arm.L", "左腕", "腕.L"),
-    "arm.R": ("arm.R", "upper_arm.R", "右腕", "腕.R"),
-    "leg.L": ("leg.L", "thigh.L", "左足", "足.L"),
-    "leg.R": ("leg.R", "thigh.R", "右足", "足.R"),
-    "eyes": ("eyes", "eye", "両目"),
-}
+POSE_BONE_ALIASES = BONE_ALIASES
 
 BLINK_SHAPE_ALIASES = {"blink", "eye_blink", "eyeblink", "まばたき"}
 
@@ -52,6 +52,17 @@ def arguments() -> argparse.Namespace:
 def load_json(path: Path) -> dict:
     with path.open("r", encoding="utf-8-sig") as handle:
         return json.load(handle)
+
+
+def atomic_write_json(path: Path, payload: dict) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_name(f".{path.name}.tmp")
+    with temporary.open("w", encoding="utf-8", newline="\n") as handle:
+        json.dump(payload, handle, ensure_ascii=False, indent=2)
+        handle.write("\n")
+        handle.flush()
+        os.fsync(handle.fileno())
+    os.replace(temporary, path)
 
 
 def armature_for(character: str):
@@ -81,7 +92,29 @@ def pose_bone_for(armature, alias: str):
     for name in candidates:
         if name.casefold() in lowered:
             return lowered[name.casefold()]
+    resolved = match_aliases(
+        [bone.name for bone in armature.pose.bones], {alias: tuple(candidates)}
+    ).get(alias)
+    if resolved:
+        return armature.pose.bones.get(resolved)
     return None
+
+
+def _neutral_quaternion(bone):
+    stored = bone.get("pipeline_neutral_quaternion")
+    if stored and len(stored) == 4:
+        from mathutils import Quaternion
+        return Quaternion(tuple(float(value) for value in stored))
+    return bone.rotation_quaternion.copy() if bone.rotation_mode == "QUATERNION" else Euler(
+        bone.rotation_euler, bone.rotation_mode
+    ).to_quaternion()
+
+
+def _semantic_delta_quaternion(bone, rotation):
+    """Convert canonical armature-space XYZ intent into this bone's local axes."""
+    rest = bone.bone.matrix_local.to_quaternion()
+    semantic = Euler(rotation, "XYZ").to_quaternion()
+    return rest.inverted() @ semantic @ rest
 
 
 def look_direction(armature, target_name: str | None) -> float:
@@ -126,10 +159,11 @@ def animate_performances(manifest: dict) -> tuple[int, int, int, int, int]:
                 if not bone:
                     skipped_bones.add((character, alias))
                     continue
-                bone.rotation_mode = "XYZ"
-                bone.rotation_euler = rotation
+                neutral = _neutral_quaternion(bone)
+                bone.rotation_mode = "QUATERNION"
+                bone.rotation_quaternion = neutral @ _semantic_delta_quaternion(bone, rotation)
                 bone.keyframe_insert(
-                    data_path="rotation_euler", frame=keyframe["frame"],
+                    data_path="rotation_quaternion", frame=keyframe["frame"],
                     group=f"PIPE_{alias}",
                 )
                 inserted += 1
@@ -366,16 +400,23 @@ def animate_dialogue(manifest: dict) -> tuple[int, int]:
 
 
 def _character_objects(character: str):
+    roots = [obj for obj in bpy.data.objects
+             if obj.get("pipeline_character_root") == character]
     armatures = [obj for obj in bpy.data.objects
                  if obj.type == "ARMATURE" and obj.get("pipeline_character") == character]
-    owned = set(armatures)
+    owned = set(roots + armatures)
     for obj in bpy.data.objects:
         parent = obj.parent
         while parent:
-            if parent in armatures:
+            if parent in roots or parent in armatures:
                 owned.add(obj)
                 break
             parent = parent.parent
+        if obj.type == "MESH" and any(
+            modifier.type == "ARMATURE" and modifier.object in armatures
+            for modifier in obj.modifiers
+        ):
+            owned.add(obj)
         if obj.get("pipeline_mouth_target") == character:
             owned.add(obj)
     return owned
@@ -395,7 +436,11 @@ def load_character_assets(project: Path, manifest: dict) -> tuple[int, int, int,
         cache = (project / item["cache_blend"]).resolve()
         if not cache.is_file():
             raise RuntimeError(f"Production character cache is missing: {cache}")
-        for obj in _character_objects(item["character"]):
+        existing = sorted(
+            _character_objects(item["character"]),
+            key=_parent_depth, reverse=True,
+        )
+        for obj in existing:
             bpy.data.objects.remove(obj, do_unlink=True)
         with bpy.data.libraries.load(str(cache), link=False) as (data_from, data_to):
             if item["cache_collection"] not in data_from.collections:
@@ -410,6 +455,13 @@ def load_character_assets(project: Path, manifest: dict) -> tuple[int, int, int,
         armature = armature_for(item["character"])
         if armature.name != item["armature_object"]:
             raise RuntimeError(f"Character armature identity mismatch: {item['character']}")
+        armature["pipeline_character"] = item["character"]
+        for alias, name in item.get("bone_mapping", {}).items():
+            if name and armature.pose.bones.get(name):
+                armature[f"pipeline_bone_{alias.replace('.', '_')}"] = name
+        for alias, name in item.get("morph_mapping", {}).items():
+            if name:
+                armature[f"pipeline_morph_{alias}"] = name
         loaded += 1
         resolved_bones += int(item["resolved_bone_count"])
         resolved_mouth += int(item["resolved_mouth_morph_count"])
@@ -417,6 +469,246 @@ def load_character_assets(project: Path, manifest: dict) -> tuple[int, int, int,
         license_warnings += int(item["license_warning"])
     bpy.context.view_layer.update()
     return loaded, resolved_bones, resolved_mouth, missing_textures, license_warnings
+
+
+def _parent_depth(obj) -> int:
+    depth = 0
+    parent = obj.parent
+    while parent:
+        depth += 1
+        parent = parent.parent
+    return depth
+
+
+def character_root_for(character: str, armature=None):
+    for obj in bpy.data.objects:
+        if obj.get("pipeline_character_root") == character:
+            return obj
+    armature = armature or armature_for(character)
+    owned = _character_objects(character)
+    root = bpy.data.objects.new(f"PIPE_{character}_ROOT", None)
+    bpy.context.scene.collection.objects.link(root)
+    root.matrix_world = Matrix.Translation(armature.matrix_world.translation)
+    root["pipeline_character_root"] = character
+    for obj in list(owned):
+        if obj == root or obj.parent in owned:
+            continue
+        matrix = obj.matrix_world.copy()
+        obj.parent = root
+        obj.matrix_world = matrix
+    return root
+
+
+def character_meshes(character: str):
+    # Hidden MMD rigid-body/helper meshes must not affect visible character
+    # height, grounding, or adaptive camera framing.
+    return [
+        obj
+        for obj in _character_objects(character)
+        if obj.type == "MESH" and not obj.hide_render
+    ]
+
+
+def character_bounds(character: str) -> tuple[Vector, Vector]:
+    depsgraph = bpy.context.evaluated_depsgraph_get()
+    points = []
+
+    for obj in character_meshes(character):
+        evaluated = obj.evaluated_get(depsgraph)
+        mesh = evaluated.to_mesh()
+
+        try:
+            points.extend(
+                evaluated.matrix_world @ vertex.co
+                for vertex in mesh.vertices
+            )
+        finally:
+            evaluated.to_mesh_clear()
+
+    if not points:
+        raise RuntimeError(
+            f"Character has no measurable visible mesh bounds: {character}"
+        )
+
+    minimum = Vector((
+        min(point.x for point in points),
+        min(point.y for point in points),
+        min(point.z for point in points),
+    ))
+    maximum = Vector((
+        max(point.x for point in points),
+        max(point.y for point in points),
+        max(point.z for point in points),
+    ))
+    return minimum, maximum
+
+
+def _neutralize_arm(armature, alias: str, neutral_degrees: float) -> float:
+    bone = pose_bone_for(armature, alias)
+    if not bone:
+        return 180.0
+    rest = bone.bone.tail_local - bone.bone.head_local
+    if rest.length <= 1e-8:
+        return 180.0
+    rest.normalize()
+    side = 1.0 if rest.x >= 0.0 else -1.0
+    angle = math.radians(neutral_degrees)
+    target = Vector((side * math.sin(angle), 0.0, -math.cos(angle))).normalized()
+    rest_rotation = bone.bone.matrix_local.to_quaternion()
+    local_target = rest_rotation.inverted() @ target
+    correction = Vector((0.0, 1.0, 0.0)).rotation_difference(local_target.normalized())
+    bone.rotation_mode = "QUATERNION"
+    bone.rotation_quaternion = correction
+    bone["pipeline_neutral_quaternion"] = list(correction)
+    bpy.context.view_layer.update()
+    posed = bone.tail - bone.head
+    if posed.length <= 1e-8:
+        return 180.0
+    return round(math.degrees(posed.normalized().angle(target)), 5)
+
+
+def _tag_runtime_bones(armature) -> dict[str, str | None]:
+    mapping = match_aliases([bone.name for bone in armature.pose.bones], BONE_ALIASES)
+    for alias, name in mapping.items():
+        if name:
+            armature[f"pipeline_bone_{alias.replace('.', '_')}"] = name
+    return mapping
+
+
+def _ensure_foot_lock(character: str, root, alias: str, floor_z: float):
+    side = "L" if alias.endswith(".L") else "R"
+    name = f"PIPE_{character}_FootLock_{side}"
+    control = bpy.data.objects.get(name)
+    if not control:
+        control = bpy.data.objects.new(name, None)
+        bpy.context.scene.collection.objects.link(control)
+    control["pipeline_foot_lock"] = f"{character}:{side}"
+    control.empty_display_type = "PLAIN_AXES"
+    control.empty_display_size = 0.12
+    control.matrix_world = Matrix.Translation((root.matrix_world.translation.x,
+                                               root.matrix_world.translation.y,
+                                               floor_z))
+    matrix = control.matrix_world.copy()
+    control.parent = root
+    control.matrix_world = matrix
+    return control
+
+
+def harmonize_characters(manifest: dict) -> list[dict]:
+    contract = manifest.get("harmonization", {})
+    if not contract.get("enabled", False):
+        return []
+    floor_z = float(contract["floor_z"])
+    height_tolerance = float(contract["height_tolerance_ratio"])
+    ground_tolerance = float(contract["ground_tolerance_meters"])
+    neutral_limit = float(contract["rest_pose_max_degrees"])
+    neutral_degrees = float(contract["neutral_arm_degrees"])
+    results = []
+    bpy.context.scene.frame_set(int(manifest["frame_start"]))
+    for plan in contract.get("characters", []):
+        character = plan["character"]
+        armature = armature_for(character)
+        mapping = _tag_runtime_bones(armature)
+        root = character_root_for(character, armature)
+        root["pipeline_character_root"] = character
+        root["pipeline_base_yaw_radians"] = float(root.rotation_euler.z)
+
+        left_deviation = _neutralize_arm(armature, "arm.L", neutral_degrees)
+        right_deviation = _neutralize_arm(armature, "arm.R", neutral_degrees)
+        for alias in ("spine", "head", "arm.L", "arm.R", "leg.L", "leg.R", "eyes"):
+            bone = pose_bone_for(armature, alias)
+            if bone and not bone.get("pipeline_neutral_quaternion"):
+                bone.rotation_mode = "QUATERNION"
+                bone["pipeline_neutral_quaternion"] = list(bone.rotation_quaternion)
+
+        minimum, maximum = character_bounds(character)
+        measured_height = maximum.z - minimum.z
+        if measured_height <= 1e-6:
+            raise RuntimeError(f"Character height is zero: {character}")
+        target_height = float(plan["target_height_meters"])
+        scale_factor = target_height / measured_height
+        root.scale = tuple(float(component) * scale_factor for component in root.scale)
+        bpy.context.view_layer.update()
+        minimum, maximum = character_bounds(character)
+        root.location.z += floor_z - minimum.z
+        root["pipeline_ground_offset_z"] = float(root.location.z)
+        root["pipeline_target_height_meters"] = target_height
+        bpy.context.view_layer.update()
+        minimum, maximum = character_bounds(character)
+        dimensions = maximum - minimum
+        center = (minimum + maximum) * 0.5
+        root["pipeline_stage_offset_x"] = float(root.location.x - center.x)
+        root["pipeline_stage_offset_y"] = float(root.location.y - center.y)
+        measured_height = dimensions.z
+        height_error = abs(measured_height - target_height) / target_height
+        ground_error = abs(minimum.z - floor_z)
+
+        left_rest = None
+        right_rest = None
+        if mapping.get("arm.L") and mapping.get("arm.R"):
+            left_bone = armature.data.bones.get(mapping["arm.L"])
+            right_bone = armature.data.bones.get(mapping["arm.R"])
+            if left_bone and right_bone:
+                left_rest = left_bone.tail_local - left_bone.head_local
+                right_rest = right_bone.tail_local - right_bone.head_local
+        axis_verified = bool(
+            left_rest is not None and right_rest is not None
+            and left_rest.length > 1e-8 and right_rest.length > 1e-8
+            and left_rest.x * right_rest.x < 0.0
+        )
+
+        source_ik = 0
+        for alias in ("leg_ik.L", "leg_ik.R"):
+            ik_bone = pose_bone_for(armature, alias)
+            if ik_bone:
+                ik_bone.lock_location = (True, True, True)
+                ik_bone["pipeline_foot_lock"] = True
+                source_ik += 1
+            else:
+                _ensure_foot_lock(character, root, alias, floor_z)
+
+        resolved_controls = 0
+        for alias in PHASE8_REQUIRED_CONTROLS:
+            if alias == "root":
+                available = root is not None
+            elif alias == "eyes":
+                available = pose_bone_for(armature, "eyes") is not None or bool(
+                    eye_objects_for(character)
+                )
+            elif alias in {"leg_ik.L", "leg_ik.R"}:
+                available = True  # source IK or an application-owned grounded fallback
+            else:
+                available = pose_bone_for(armature, alias) is not None
+            resolved_controls += int(available)
+
+        neutral_deviation = max(left_deviation, right_deviation)
+        neutral_passed = neutral_deviation <= neutral_limit
+        height_passed = height_error <= height_tolerance
+        grounding_passed = ground_error <= ground_tolerance
+        controls_passed = resolved_controls == len(PHASE8_REQUIRED_CONTROLS)
+        ready = neutral_passed and height_passed and grounding_passed and axis_verified and controls_passed
+        results.append({
+            "character": character,
+            "root_object": root.name,
+            "target_height_meters": round(target_height, 5),
+            "measured_height_meters": round(measured_height, 5),
+            "height_error_ratio": round(height_error, 6),
+            "scale_factor": round(scale_factor, 6),
+            "world_bounds_min": [round(value, 5) for value in minimum],
+            "world_bounds_max": [round(value, 5) for value in maximum],
+            "neutral_pose": "neutral_dialogue",
+            "arm_deviation_degrees": round(neutral_deviation, 5),
+            "neutral_pose_passed": neutral_passed,
+            "ground_plane_z": round(floor_z, 5),
+            "ground_error_meters": round(ground_error, 6),
+            "grounding_passed": grounding_passed,
+            "foot_lock_mode": "source_ik" if source_ik == 2 else "root_grounded",
+            "bone_axes_verified": axis_verified,
+            "required_control_count": len(PHASE8_REQUIRED_CONTROLS),
+            "resolved_control_count": resolved_controls,
+            "ready": ready,
+        })
+    return results
 
 
 def camera_collection():
@@ -431,11 +723,181 @@ def target_point(character: str | None) -> Vector:
     if not character:
         return Vector((0, 0, 1.5))
     armature = armature_for(character)
-    return armature.matrix_world @ Vector((0, 0, 1.65))
+    head = pose_bone_for(armature, "head")
+    if head:
+        return armature.matrix_world @ ((head.head + head.tail) * 0.5)
+    minimum, maximum = character_bounds(character)
+    return Vector(((minimum.x + maximum.x) * 0.5,
+                   (minimum.y + maximum.y) * 0.5,
+                   minimum.z + (maximum.z - minimum.z) * 0.88))
 
 
 def _camera_rotation(location: Vector, target: Vector):
     return (target - location).to_track_quat("-Z", "Y").to_euler()
+
+
+def _union_bounds(characters: list[str]) -> tuple[Vector, Vector]:
+    bounds = [character_bounds(character) for character in characters]
+    minimum = Vector((min(item[0].x for item in bounds),
+                      min(item[0].y for item in bounds),
+                      min(item[0].z for item in bounds)))
+    maximum = Vector((max(item[1].x for item in bounds),
+                      max(item[1].y for item in bounds),
+                      max(item[1].z for item in bounds)))
+    return minimum, maximum
+
+
+def _shot_region(shot: dict, blocking: dict, contract: dict):
+    composition = blocking.get("composition", "single")
+    subject = blocking.get("subject") or shot.get("target")
+    if not subject:
+        subject = next(
+            (item.get("character") for item in contract.get("characters", [])
+             if item.get("character")),
+            None,
+        )
+    if not subject:
+        raise RuntimeError(f"Adaptive camera has no subject: {shot['shot_id']}")
+    placements = blocking.get("placements", [])
+    cast = [item["character"] for item in placements]
+    required = cast if composition == "two_shot" and cast else [subject]
+    minimum, maximum = _union_bounds(required)
+    height = maximum.z - minimum.z
+    head = target_point(subject)
+    region = "face" if composition == "close_up" else "full_body"
+    if region == "face":
+        subject_minimum, subject_maximum = character_bounds(subject)
+        subject_height = subject_maximum.z - subject_minimum.z
+        half_width = max(0.16, (subject_maximum.x - subject_minimum.x) * 0.36)
+        minimum = Vector((head.x - half_width, subject_minimum.y,
+                          max(subject_minimum.z, head.z - subject_height * 0.30)))
+        maximum = Vector((head.x + half_width, subject_maximum.y,
+                          subject_maximum.z + subject_height * float(contract["headroom_fraction"])))
+    else:
+        minimum.z -= height * float(contract["footroom_fraction"])
+        maximum.z += height * float(contract["headroom_fraction"])
+    return required, subject, region, head, minimum, maximum
+
+
+def adaptive_camera_contract(manifest: dict, shot: dict, blocking: dict) -> tuple[dict, dict]:
+    contract = manifest["harmonization"]
+    required, subject, region, head, minimum, maximum = _shot_region(
+        shot, blocking, contract
+    )
+    dimensions = maximum - minimum
+    composition = blocking.get("composition", "single")
+    fallback_lenses = {"close_up": 68.0, "over_shoulder": 58.0,
+                       "two_shot": 52.0, "single": 56.0}
+    original = blocking.get("camera", {})
+    lens = float(original.get("lens_mm", fallback_lenses.get(composition, 56.0)))
+    aspect = float(manifest["render"]["width"]) / float(manifest["render"]["height"])
+    distance = camera_fit_distance(
+        max(0.1, dimensions.x), max(0.1, dimensions.z), lens, aspect,
+        float(contract["safe_frame_fraction"]),
+    ) * 1.08 + max(0.0, dimensions.y) / 2.0
+    movement = original.get("movement", "static")
+    original_start = Vector(original.get("start_location", (0.0, 0.0, 0.0)))
+    original_end = Vector(original.get("end_location", original_start))
+    movement_delta = original_end - original_start
+    # A dolly-in must still fit at the closest keyed position.
+    distance += max(0.0, movement_delta.y)
+    center = (minimum + maximum) * 0.5
+    start_target = Vector((head.x, center.y, center.z)) if region == "face" else center
+    start_location = Vector((center.x, minimum.y - distance, start_target.z))
+    end_location = start_location + movement_delta
+    target_delta = Vector(original.get("end_target", (0.0, 0.0, 0.0))) - Vector(
+        original.get("start_target", (0.0, 0.0, 0.0))
+    )
+    end_target = start_target + target_delta
+    margin = round((1.0 - float(contract["safe_frame_fraction"])) / 2.0, 4)
+    plan = {
+        "movement": movement,
+        "lens_mm": lens,
+        "start_location": [round(value, 5) for value in start_location],
+        "end_location": [round(value, 5) for value in end_location],
+        "start_target": [round(value, 5) for value in start_target],
+        "end_target": [round(value, 5) for value in end_target],
+        "adaptive": True,
+        "required_region": region,
+        "frame_margin_fraction": margin,
+        "subject_height_meters": round(
+            character_bounds(subject)[1].z - character_bounds(subject)[0].z, 5
+        ),
+    }
+    basis = {
+        "required_characters": required, "subject": subject, "required_region": region,
+        "head": head, "minimum": minimum, "maximum": maximum, "margin": margin,
+    }
+    return plan, basis
+
+
+def _box_corners(minimum: Vector, maximum: Vector) -> list[Vector]:
+    return [Vector((x, y, z)) for x in (minimum.x, maximum.x)
+            for y in (minimum.y, maximum.y) for z in (minimum.z, maximum.z)]
+
+
+def audit_camera_framing(manifest: dict, shot: dict, blocking: dict, camera) -> dict:
+    scene = bpy.context.scene
+    frames = [int(shot["start_frame"]), int(shot["end_frame"])]
+    all_inside = True
+    head_visible = True
+    feet_visible = True
+    minimum_margin = 1.0
+    final_minimum = final_maximum = None
+    required_region = "full_body"
+    required_characters = []
+    subject = blocking.get("subject") or shot.get("target")
+    for frame in frames:
+        scene.frame_set(frame)
+        bpy.context.view_layer.update()
+        required_characters, subject, required_region, head, minimum, maximum = _shot_region(
+            shot, blocking, manifest["harmonization"]
+        )
+        final_minimum, final_maximum = minimum, maximum
+        margin = float(camera.get("pipeline_frame_margin", 0.04))
+        projected = [world_to_camera_view(scene, camera, point)
+                     for point in _box_corners(minimum, maximum)]
+        inside = all(
+            point.z > 0 and margin <= point.x <= 1.0 - margin
+            and margin <= point.y <= 1.0 - margin
+            for point in projected
+        )
+        all_inside = all_inside and inside
+        for point in projected:
+            minimum_margin = min(minimum_margin, point.x, 1.0 - point.x,
+                                 point.y, 1.0 - point.y)
+        head_projection = world_to_camera_view(scene, camera, head)
+        head_visible = head_visible and (
+            head_projection.z > 0 and margin <= head_projection.x <= 1.0 - margin
+            and margin <= head_projection.y <= 1.0 - margin
+        )
+        if required_region == "full_body":
+            foot_points = [Vector((x, y, minimum.z)) for x in (minimum.x, maximum.x)
+                           for y in (minimum.y, maximum.y)]
+            feet_visible = feet_visible and all(
+                (projection := world_to_camera_view(scene, camera, point)).z > 0
+                and margin <= projection.x <= 1.0 - margin
+                and margin <= projection.y <= 1.0 - margin
+                for point in foot_points
+            )
+    passed = all_inside and head_visible and feet_visible
+    return {
+        "scene_id": shot["scene_id"],
+        "shot_id": shot["shot_id"],
+        "composition": blocking.get("composition", "single"),
+        "subject": subject,
+        "required_characters": required_characters,
+        "required_region": required_region,
+        "world_bounds_min": [round(value, 5) for value in final_minimum],
+        "world_bounds_max": [round(value, 5) for value in final_maximum],
+        "lens_mm": round(float(camera.data.lens), 4),
+        "frame_margin_fraction": round(float(camera.get("pipeline_frame_margin", 0.04)), 4),
+        "measured_minimum_margin": round(minimum_margin, 6),
+        "head_visible": head_visible,
+        "feet_required": required_region == "full_body",
+        "feet_visible": feet_visible,
+        "framing_passed": passed,
+    }
 
 
 def create_camera(shot: dict, settings: dict, blocking: dict | None = None):
@@ -474,6 +936,11 @@ def create_camera(shot: dict, settings: dict, blocking: dict | None = None):
         camera["pipeline_shot_id"] = shot["shot_id"]
         camera["pipeline_composition"] = blocking["composition"]
         camera["pipeline_camera_movement"] = movement
+        camera["pipeline_adaptive"] = bool(camera_plan.get("adaptive", False))
+        camera["pipeline_required_region"] = camera_plan.get("required_region", "full_body")
+        camera["pipeline_frame_margin"] = float(
+            camera_plan.get("frame_margin_fraction", 0.04)
+        )
         return camera, int(movement != "static"), inserted
 
     target = target_point(shot.get("target"))
@@ -500,7 +967,7 @@ def create_camera(shot: dict, settings: dict, blocking: dict | None = None):
     return camera, 0, 0
 
 
-def assemble_cameras(manifest: dict) -> tuple[int, int, int]:
+def assemble_cameras(manifest: dict) -> tuple[int, int, int, list[dict]]:
     scene = bpy.context.scene
     for marker in list(scene.timeline_markers):
         if marker.name.startswith("PIPE_"):
@@ -508,22 +975,49 @@ def assemble_cameras(manifest: dict) -> tuple[int, int, int]:
     first = None
     camera_movements = 0
     camera_keyframes = 0
+    audits = []
     blocking = {
         shot["shot_id"]: shot
         for shot in manifest.get("blocking", {}).get("shots", [])
     }
+    adaptive = bool(manifest.get("harmonization", {}).get("enabled", False))
     for shot in manifest["shots"]:
+        scene.frame_set(int(shot["start_frame"]))
+        bpy.context.view_layer.update()
+        shot_blocking = blocking.get(shot["shot_id"])
+        if not shot_blocking:
+            shot_type = shot.get("shot_type")
+            composition = (
+                "close_up" if shot_type == "close_up"
+                else "two_shot" if shot_type in {"wide", "long"}
+                else "single"
+            )
+            fallback_cast = [
+                {"character": item["character"]}
+                for item in manifest.get("harmonization", {}).get("characters", [])
+            ] if composition == "two_shot" else []
+            shot_blocking = {
+                "composition": composition, "subject": shot.get("target"),
+                "listener": None, "placements": fallback_cast,
+                "camera": {"movement": "static"},
+            }
+        if adaptive:
+            plan, _basis = adaptive_camera_contract(manifest, shot, shot_blocking)
+            shot_blocking = dict(shot_blocking)
+            shot_blocking["camera"] = plan
         camera, moved, inserted = create_camera(
-            shot, manifest.get("camera", {}), blocking.get(shot["shot_id"])
+            shot, manifest.get("camera", {}), shot_blocking
         )
         camera_movements += moved
         camera_keyframes += inserted
         marker = scene.timeline_markers.new(f"PIPE_{shot['shot_id']}", frame=shot["start_frame"])
         marker.camera = camera
         first = first or camera
+        if adaptive:
+            audits.append(audit_camera_framing(manifest, shot, shot_blocking, camera))
     if first:
         scene.camera = first
-    return len(manifest["shots"]), camera_movements, camera_keyframes
+    return len(manifest["shots"]), camera_movements, camera_keyframes, audits
 
 
 def animate_blocking(manifest: dict) -> tuple[int, int, int]:
@@ -537,20 +1031,25 @@ def animate_blocking(manifest: dict) -> tuple[int, int, int]:
         start, end = int(shot["start_frame"]), int(shot["end_frame"])
         for placement in shot["placements"]:
             armature = armature_for(placement["character"])
-            armature.rotation_mode = "XYZ"
+            control = character_root_for(placement["character"], armature)
+            control.rotation_mode = "XYZ"
             location = Vector(placement["position"])
+            location.x += float(control.get("pipeline_stage_offset_x", 0.0))
+            location.y += float(control.get("pipeline_stage_offset_y", 0.0))
+            location.z += float(control.get("pipeline_ground_offset_z", control.location.z))
             yaw = math.radians(float(placement["body_yaw_degrees"]))
+            base_yaw = float(control.get("pipeline_base_yaw_radians", 0.0))
             for frame in (start, end):
-                armature.location = location
-                armature.rotation_euler.z = yaw
-                armature.keyframe_insert(data_path="location", frame=frame,
-                                         group="PIPE_Blocking")
-                armature.keyframe_insert(data_path="rotation_euler", index=2, frame=frame,
-                                         group="PIPE_Blocking")
+                control.location = location
+                control.rotation_euler.z = base_yaw + yaw
+                control.keyframe_insert(data_path="location", frame=frame,
+                                        group="PIPE_Blocking")
+                control.keyframe_insert(data_path="rotation_euler", index=2, frame=frame,
+                                        group="PIPE_Blocking")
                 inserted += 2
             placements += 1
             body_facings += placement.get("facing_target") is not None
-            touched.add(armature.name)
+            touched.add(control.name)
     for name in touched:
         armature = bpy.data.objects.get(name)
         action = armature.animation_data.action if armature and armature.animation_data else None
@@ -634,9 +1133,20 @@ def write_report(project: Path, manifest: dict, *, camera_count: int, audio_coun
                  blocking_conflicts: int, production_characters: int,
                  production_characters_loaded: int, resolved_character_bones: int,
                  resolved_character_mouth_morphs: int, character_texture_missing: int,
-                 character_license_warnings: int, rendered: bool) -> Path:
+                 character_license_warnings: int, harmonization_results: list[dict],
+                 camera_audits: list[dict], rendered: bool) -> Path:
     output_scene = (project / manifest["output_scene"]).resolve()
     preview = (project / manifest["preview_video"]).resolve()
+    harmonization_enabled = bool(manifest.get("harmonization", {}).get("enabled", False))
+    harmonization_ready = sum(item["ready"] for item in harmonization_results)
+    neutral_ready = sum(item["neutral_pose_passed"] for item in harmonization_results)
+    grounded = sum(item["grounding_passed"] for item in harmonization_results)
+    axes_verified = sum(item["bone_axes_verified"] for item in harmonization_results)
+    adaptive_passed = sum(item["framing_passed"] for item in camera_audits)
+    phase8_issues = (
+        sum(not item["ready"] for item in harmonization_results)
+        + sum(not item["framing_passed"] for item in camera_audits)
+    )
     report = {
         "phase": 3, "status": "complete", "fps": manifest["fps"],
         "frame_start": manifest["frame_start"], "frame_end": manifest["frame_end"],
@@ -668,14 +1178,75 @@ def write_report(project: Path, manifest: dict, *, camera_count: int, audio_coun
         "resolved_character_mouth_morph_count": resolved_character_mouth_morphs,
         "character_texture_missing_count": character_texture_missing,
         "character_license_warning_count": character_license_warnings,
+        "harmonization_enabled": harmonization_enabled,
+        "harmonization_character_count": len(harmonization_results),
+        "harmonization_ready_count": harmonization_ready,
+        "neutral_pose_character_count": neutral_ready,
+        "grounded_character_count": grounded,
+        "bone_axes_verified_count": axes_verified,
+        "adaptive_camera_shot_count": len(camera_audits),
+        "adaptive_camera_pass_count": adaptive_passed,
+        "phase8_issue_count": phase8_issues,
+        "phase8_report": manifest.get("harmonization", {}).get(
+            "report", "generated/phase8_harmonization_report.json"
+        ),
         "scene_file": output_scene.relative_to(project).as_posix(),
         "preview_video": preview.relative_to(project).as_posix() if rendered else None,
     }
     report_path = project / "generated" / "phase3_scene_report.json"
-    report_path.parent.mkdir(parents=True, exist_ok=True)
-    with report_path.open("w", encoding="utf-8", newline="\n") as handle:
-        json.dump(report, handle, ensure_ascii=False, indent=2)
-        handle.write("\n")
+    atomic_write_json(report_path, report)
+    return report_path
+
+
+def write_phase8_report(project: Path, manifest: dict, characters: list[dict],
+                        shots: list[dict]) -> Path:
+    contract = manifest.get("harmonization", {})
+    enabled = bool(contract.get("enabled", False))
+    ready = sum(item["ready"] for item in characters)
+    neutral = sum(item["neutral_pose_passed"] for item in characters)
+    scaled = sum(
+        item["height_error_ratio"] <= float(contract.get("height_tolerance_ratio", 0.02))
+        for item in characters
+    )
+    grounded = sum(item["grounding_passed"] for item in characters)
+    axes = sum(item["bone_axes_verified"] for item in characters)
+    source_ik = sum(item["foot_lock_mode"] == "source_ik" for item in characters)
+    framed = sum(item["framing_passed"] for item in shots)
+    issues = sum(not item["ready"] for item in characters) + sum(
+        not item["framing_passed"] for item in shots
+    )
+    report = {
+        "schema_version": 1,
+        "phase": 8,
+        "status": "skipped" if not enabled else "complete" if issues == 0 else "failed",
+        "enabled": enabled,
+        "project_name": manifest["project_name"],
+        "frame_start": int(manifest["frame_start"]),
+        "frame_end": int(manifest["frame_end"]),
+        "pose": contract.get("pose", "neutral_dialogue"),
+        "characters": characters,
+        "shots": shots,
+        "summary": {
+            "character_count": len(characters),
+            "ready_character_count": ready,
+            "neutral_pose_character_count": neutral,
+            "scaled_character_count": scaled,
+            "grounded_character_count": grounded,
+            "bone_axes_verified_count": axes,
+            "source_ik_character_count": source_ik,
+            "root_grounded_character_count": len(characters) - source_ik,
+            "adaptive_camera_shot_count": len(shots),
+            "framing_passed_shot_count": framed,
+            "issue_count": issues,
+        },
+    }
+    relative = contract.get("report", "generated/phase8_harmonization_report.json")
+    report_path = (project / relative).resolve()
+    try:
+        report_path.relative_to(project.resolve())
+    except ValueError as exc:
+        raise RuntimeError("Phase 8 report path escaped the project directory") from exc
+    atomic_write_json(report_path, report)
     return report_path
 
 
@@ -688,7 +1259,7 @@ def main() -> None:
     (production_characters_loaded, resolved_character_bones,
      resolved_character_mouth_morphs, character_texture_missing,
      character_license_warnings) = load_character_assets(project, manifest)
-    camera_count, camera_movements, camera_keyframes = assemble_cameras(manifest)
+    harmonization_results = harmonize_characters(manifest)
     audio_count = assemble_audio(project, manifest)
     performance_targets, performance_clips, gestures, pose_keyframes, skipped_bones = (
         animate_performances(manifest)
@@ -697,6 +1268,7 @@ def main() -> None:
     gaze_targets, gaze_keyframes = animate_gaze(manifest)
     blink_targets, blink_events, blink_keyframes = animate_blinks(manifest)
     mouth_targets, mouth_cues = animate_dialogue(manifest)
+    camera_count, camera_movements, camera_keyframes, camera_audits = assemble_cameras(manifest)
     direction = manifest.get("performance", {})
     blocking = manifest.get("blocking", {})
 
@@ -704,11 +1276,25 @@ def main() -> None:
     output_scene.parent.mkdir(parents=True, exist_ok=True)
     bpy.context.scene.frame_set(manifest["frame_start"])
     bpy.ops.wm.save_as_mainfile(filepath=str(output_scene))
-    if args.render:
+    phase8_report = write_phase8_report(
+        project, manifest, harmonization_results, camera_audits
+    )
+    phase8_issues = (
+        sum(not item["ready"] for item in harmonization_results)
+        + sum(not item["framing_passed"] for item in camera_audits)
+    )
+    phase8_enabled = bool(manifest.get("harmonization", {}).get("enabled", False))
+    render_allowed = not phase8_enabled or phase8_issues == 0
+    if args.render and render_allowed:
         bpy.ops.render.render(animation=True)
+    actual_framing_risks = (
+        sum(not item["framing_passed"] for item in camera_audits)
+        if phase8_enabled else int(blocking.get("framing_risk_count", 0))
+    )
     report = write_report(
         project, manifest, camera_count=camera_count, audio_count=audio_count,
-        mouth_targets=mouth_targets, mouth_cues=mouth_cues, rendered=args.render,
+        mouth_targets=mouth_targets, mouth_cues=mouth_cues,
+        rendered=args.render and render_allowed,
         performance_targets=performance_targets, performance_clips=performance_clips,
         gestures=gestures, pose_keyframes=pose_keyframes, skipped_bones=skipped_bones,
         dialogue_beats=int(direction.get("dialogue_beat_count", 0)),
@@ -721,7 +1307,7 @@ def main() -> None:
         character_placements=character_placements, body_facings=body_facings,
         placement_keyframes=placement_keyframes,
         camera_movements=camera_movements, camera_keyframes=camera_keyframes,
-        framing_risks=int(blocking.get("framing_risk_count", 0)),
+        framing_risks=actual_framing_risks,
         camera_collision_risks=int(blocking.get("camera_collision_risk_count", 0)),
         continuity_violations=int(blocking.get("continuity_violation_count", 0)),
         blocking_conflicts=int(blocking.get("blocking_conflict_count", 0)),
@@ -731,7 +1317,14 @@ def main() -> None:
         resolved_character_mouth_morphs=resolved_character_mouth_morphs,
         character_texture_missing=character_texture_missing,
         character_license_warnings=character_license_warnings,
+        harmonization_results=harmonization_results,
+        camera_audits=camera_audits,
     )
+    if phase8_enabled and not render_allowed:
+        raise RuntimeError(
+            f"Phase 8 blocked production with {phase8_issues} harmonization/framing issue(s); "
+            f"see {phase8_report}"
+        )
     print(
         f"PHASE 3 BLENDER COMPLETE: {camera_count} cameras, {audio_count} audio strips, "
         f"{mouth_cues} mouth cues, {performance_clips} performance clips, "
@@ -745,10 +1338,12 @@ def main() -> None:
         f"{production_characters_loaded} production character(s), "
         f"{resolved_character_bones} resolved bones/{resolved_character_mouth_morphs} mouth morphs, "
         f"{character_texture_missing} missing character textures, "
-        f"{blocking.get('framing_risk_count', 0)} framing risks, "
+        f"{len(harmonization_results)} harmonized character(s)/{phase8_issues} Phase 8 issues, "
+        f"{actual_framing_risks} framing risks, "
         f"{blocking.get('camera_collision_risk_count', 0)} camera collision risks, "
         f"{skipped_bones} skipped aliases, scene={output_scene}, "
-        f"preview={preview if args.render else 'not rendered'}, report={report}"
+        f"preview={preview if args.render else 'not rendered'}, "
+        f"phase8_report={phase8_report}, report={report}"
     )
 
 

@@ -1,0 +1,96 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["schema_version", "phase", "status", "enabled", "project_name", "frame_start", "frame_end", "pose", "characters", "shots", "summary"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "phase": {"const": 8},
+    "status": {"enum": ["complete", "failed", "skipped"]},
+    "enabled": {"type": "boolean"},
+    "project_name": {"type": "string", "minLength": 1},
+    "frame_start": {"type": "integer", "minimum": 1},
+    "frame_end": {"type": "integer", "minimum": 1},
+    "pose": {"const": "neutral_dialogue"},
+    "characters": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["character", "root_object", "target_height_meters", "measured_height_meters", "height_error_ratio", "scale_factor", "world_bounds_min", "world_bounds_max", "neutral_pose", "arm_deviation_degrees", "neutral_pose_passed", "ground_plane_z", "ground_error_meters", "grounding_passed", "foot_lock_mode", "bone_axes_verified", "required_control_count", "resolved_control_count", "ready"],
+        "properties": {
+          "character": {"type": "string", "minLength": 1},
+          "root_object": {"type": "string", "minLength": 1},
+          "target_height_meters": {"type": "number", "minimum": 0.5, "maximum": 5},
+          "measured_height_meters": {"type": "number", "exclusiveMinimum": 0, "maximum": 5},
+          "height_error_ratio": {"type": "number", "minimum": 0, "maximum": 10},
+          "scale_factor": {"type": "number", "exclusiveMinimum": 0, "maximum": 20},
+          "world_bounds_min": {"$ref": "#/$defs/vector3"},
+          "world_bounds_max": {"$ref": "#/$defs/vector3"},
+          "neutral_pose": {"const": "neutral_dialogue"},
+          "arm_deviation_degrees": {"type": "number", "minimum": 0, "maximum": 180},
+          "neutral_pose_passed": {"type": "boolean"},
+          "ground_plane_z": {"type": "number", "minimum": -10, "maximum": 10},
+          "ground_error_meters": {"type": "number", "minimum": 0, "maximum": 10},
+          "grounding_passed": {"type": "boolean"},
+          "foot_lock_mode": {"enum": ["source_ik", "root_grounded"]},
+          "bone_axes_verified": {"type": "boolean"},
+          "required_control_count": {"type": "integer", "minimum": 1},
+          "resolved_control_count": {"type": "integer", "minimum": 0},
+          "ready": {"type": "boolean"}
+        },
+        "additionalProperties": false
+      }
+    },
+    "shots": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["scene_id", "shot_id", "composition", "subject", "required_characters", "required_region", "world_bounds_min", "world_bounds_max", "lens_mm", "frame_margin_fraction", "measured_minimum_margin", "head_visible", "feet_required", "feet_visible", "framing_passed"],
+        "properties": {
+          "scene_id": {"type": "string", "minLength": 1},
+          "shot_id": {"type": "string", "minLength": 1},
+          "composition": {"enum": ["single", "close_up", "over_shoulder", "two_shot"]},
+          "subject": {"type": "string", "minLength": 1},
+          "required_characters": {
+            "type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}
+          },
+          "required_region": {"enum": ["face", "full_body"]},
+          "world_bounds_min": {"$ref": "#/$defs/vector3"},
+          "world_bounds_max": {"$ref": "#/$defs/vector3"},
+          "lens_mm": {"type": "number", "minimum": 18, "maximum": 200},
+          "frame_margin_fraction": {"type": "number", "minimum": 0, "maximum": 0.25},
+          "measured_minimum_margin": {"type": "number", "minimum": -10, "maximum": 1},
+          "head_visible": {"type": "boolean"},
+          "feet_required": {"type": "boolean"},
+          "feet_visible": {"type": "boolean"},
+          "framing_passed": {"type": "boolean"}
+        },
+        "additionalProperties": false
+      }
+    },
+    "summary": {
+      "type": "object",
+      "required": ["character_count", "ready_character_count", "neutral_pose_character_count", "scaled_character_count", "grounded_character_count", "bone_axes_verified_count", "source_ik_character_count", "root_grounded_character_count", "adaptive_camera_shot_count", "framing_passed_shot_count", "issue_count"],
+      "properties": {
+        "character_count": {"type": "integer", "minimum": 0},
+        "ready_character_count": {"type": "integer", "minimum": 0},
+        "neutral_pose_character_count": {"type": "integer", "minimum": 0},
+        "scaled_character_count": {"type": "integer", "minimum": 0},
+        "grounded_character_count": {"type": "integer", "minimum": 0},
+        "bone_axes_verified_count": {"type": "integer", "minimum": 0},
+        "source_ik_character_count": {"type": "integer", "minimum": 0},
+        "root_grounded_character_count": {"type": "integer", "minimum": 0},
+        "adaptive_camera_shot_count": {"type": "integer", "minimum": 0},
+        "framing_passed_shot_count": {"type": "integer", "minimum": 0},
+        "issue_count": {"type": "integer", "minimum": 0}
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "vector3": {
+      "type": "array", "minItems": 3, "maxItems": 3,
+      "items": {"type": "number", "minimum": -1000, "maximum": 1000}
+    }
+  }
+}

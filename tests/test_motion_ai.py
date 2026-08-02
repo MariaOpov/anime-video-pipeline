@@ -16,7 +16,7 @@ from anime_pipeline.motion_ai import (
     motion_intent_warnings,
     validate_motion_intent,
 )
-from anime_pipeline.studio import ProjectStudio, StudioJobManager, build_job_command
+from anime_pipeline.studio import DOCUMENTS, ProjectStudio, StudioJobManager, build_job_command
 
 
 class FakeResponse:
@@ -169,6 +169,12 @@ class MotionAITests(unittest.TestCase):
             self.assertEqual(studio.read_script(), "Aiko: Xin chào\nRen: Chào cậu")
             with self.assertRaisesRegex(ValueError, "empty"):
                 studio.write_script("  ")
+
+    def test_studio_exposes_phase8_harmonization_report(self):
+        self.assertEqual(
+            DOCUMENTS["phase8_harmonization_report"],
+            "generated/phase8_harmonization_report.json",
+        )
 
 
 if __name__ == "__main__":

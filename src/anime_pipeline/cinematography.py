@@ -12,6 +12,8 @@ import math
 from collections import defaultdict
 from typing import Any
 
+from .harmonization import camera_fit_distance, character_geometry
+
 
 COMPOSITIONS = {"single", "close_up", "over_shoulder", "two_shot"}
 CAMERA_MOVES = {"static", "slow_dolly_in", "slow_dolly_out", "lateral_drift"}
@@ -73,33 +75,62 @@ def _camera_contract(shot: dict[str, Any], *, composition: str,
                      subject_position: tuple[float, float, float],
                      listener_position: tuple[float, float, float] | None,
                      index: int, total: int, camera_settings: dict[str, Any],
-                     direction_settings: dict[str, Any]) -> dict[str, Any]:
+                     direction_settings: dict[str, Any],
+                     subject_geometry: dict[str, float],
+                     listener_geometry: dict[str, float] | None,
+                     safe_fraction: float, adaptive: bool) -> dict[str, Any]:
     subject_x = subject_position[0]
     listener_x = listener_position[0] if listener_position else subject_x
     look_sign = 0.0 if listener_position is None else math.copysign(1.0, listener_x - subject_x)
+    subject_height = float(subject_geometry["height"])
+    subject_width = float(subject_geometry["width"])
+    subject_depth = float(subject_geometry["depth"])
+    listener_height = float(listener_geometry["height"]) if listener_geometry else subject_height
+    listener_width = float(listener_geometry["width"]) if listener_geometry else subject_width
+    listener_depth = float(listener_geometry["depth"]) if listener_geometry else subject_depth
+    required_region = "face" if composition == "close_up" else "full_body"
     if composition == "two_shot":
-        distance = float(camera_settings.get("wide_distance", 8.6)) * 0.82
         lens = 52.0
-        camera_x = (subject_x + listener_x) / 2.0
-        target_x = camera_x
-        camera_z, target_z = 1.72, 1.52
+        minimum_x = min(subject_x - subject_width / 2.0, listener_x - listener_width / 2.0)
+        maximum_x = max(subject_x + subject_width / 2.0, listener_x + listener_width / 2.0)
+        view_width = maximum_x - minimum_x
+        view_height = max(subject_height, listener_height)
+        camera_x = target_x = (minimum_x + maximum_x) / 2.0
+        target_z = view_height / 2.0
+        camera_z = target_z
+        view_depth = max(subject_depth, listener_depth)
     elif composition == "close_up":
-        distance = float(camera_settings.get("close_up_distance", 4.2))
         lens = 68.0
         camera_x = subject_x
         target_x = subject_x + look_sign * 0.16
-        camera_z, target_z = 1.98, 1.88
+        view_width = max(subject_width * 0.72, 0.32)
+        view_height = subject_height * 0.46
+        target_z = float(subject_geometry["head_height"]) - subject_height * 0.16
+        camera_z = target_z + subject_height * 0.035
+        view_depth = subject_depth
     elif composition == "over_shoulder":
-        distance = float(camera_settings.get("medium_distance", 6.4)) * 0.92
         lens = 58.0
         camera_x = subject_x - look_sign * 0.32
         target_x = subject_x + look_sign * 0.14
-        camera_z, target_z = 1.78, 1.67
+        view_width = subject_width * 1.15
+        view_height = subject_height
+        target_z = subject_height / 2.0
+        camera_z = target_z + subject_height * 0.06
+        view_depth = max(subject_depth, listener_depth)
     else:
-        distance = float(camera_settings.get("medium_distance", 6.4))
         lens = 56.0
         camera_x, target_x = subject_x, subject_x
-        camera_z, target_z = 1.76, 1.64
+        view_width = subject_width
+        view_height = subject_height
+        target_z = subject_height / 2.0
+        camera_z = target_z + subject_height * 0.04
+        view_depth = subject_depth
+
+    aspect_ratio = float(camera_settings.get("aspect_ratio", 16.0 / 9.0))
+    distance = camera_fit_distance(
+        max(0.1, view_width), max(0.1, view_height), lens, aspect_ratio, safe_fraction
+    ) + view_depth / 2.0
+    distance = max(1.55, round(distance, 4))
 
     start_location = [round(camera_x, 4), round(-distance, 4), camera_z]
     end_location = list(start_location)
@@ -124,6 +155,9 @@ def _camera_contract(shot: dict[str, Any], *, composition: str,
         "movement": movement, "lens_mm": lens,
         "start_location": start_location, "end_location": end_location,
         "start_target": start_target, "end_target": end_target,
+        "adaptive": adaptive, "required_region": required_region,
+        "frame_margin_fraction": round((1.0 - safe_fraction) / 2.0, 4),
+        "subject_height_meters": round(subject_height, 5),
     }
 
 
@@ -161,7 +195,8 @@ def _collision_risk(camera: dict[str, Any], positions: dict[str, tuple[float, fl
 
 def direct_cinematography(shots: list[dict[str, Any]], performance: dict[str, Any],
                           camera_settings: dict[str, Any],
-                          settings: dict[str, Any] | None = None) -> dict[str, Any]:
+                          settings: dict[str, Any] | None = None, *,
+                          harmonization: dict[str, Any] | None = None) -> dict[str, Any]:
     """Build a deterministic, schema-friendly blocking contract."""
     settings = settings or {}
     enabled = bool(settings.get("enabled", True))
@@ -193,6 +228,9 @@ def direct_cinematography(shots: list[dict[str, Any]], performance: dict[str, An
         raise ValueError("body turn must be between 0 and 35 degrees")
     safe_fraction = float(settings.get("safe_frame_fraction", 0.86))
     clearance = float(settings.get("minimum_camera_clearance", 1.5))
+    geometry = character_geometry(harmonization)
+    default_geometry = {"width": 0.62, "depth": 0.38, "height": 1.72,
+                        "head_height": 1.5824}
 
     previous_order: list[str] | None = None
     total = len(shots)
@@ -227,6 +265,10 @@ def direct_cinematography(shots: list[dict[str, Any]], performance: dict[str, An
             shot, composition=composition, subject_position=positions[subject],
             listener_position=positions.get(listener), index=index, total=total,
             camera_settings=camera_settings, direction_settings=settings,
+            subject_geometry=geometry.get(subject, default_geometry),
+            listener_geometry=geometry.get(listener, default_geometry) if listener else None,
+            safe_fraction=safe_fraction,
+            adaptive=bool(harmonization and harmonization.get("enabled", False)),
         )
         required = cast if composition == "two_shot" else [subject]
         framing_risks = _framing_risk(camera, positions, required, safe_fraction)

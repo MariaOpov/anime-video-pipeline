@@ -9,6 +9,12 @@ from pathlib import Path
 from typing import Any
 
 from .io_utils import atomic_write_json, load_json, validate
+from .rig_contract import (
+    BONE_ALIASES,
+    MORPH_ALIASES,
+    PHASE7_REQUIRED_BONES,
+    match_aliases,
+)
 
 
 MODEL_EXTENSIONS = {".pmx", ".pmd"}
@@ -16,25 +22,7 @@ TEXTURE_EXTENSIONS = {
     ".png", ".bmp", ".jpg", ".jpeg", ".tga", ".webp", ".dds", ".spa", ".sph",
 }
 
-BONE_ALIASES: dict[str, tuple[str, ...]] = {
-    "spine": ("上半身2", "上半身", "spine", "upper_body", "upper body"),
-    "head": ("頭", "head"),
-    "arm.L": ("左腕", "腕.L", "arm.L", "upper_arm.L", "left arm"),
-    "arm.R": ("右腕", "腕.R", "arm.R", "upper_arm.R", "right arm"),
-    "leg.L": ("左足", "足.L", "leg.L", "thigh.L", "left leg"),
-    "leg.R": ("右足", "足.R", "leg.R", "thigh.R", "right leg"),
-    "eyes": ("両目", "目", "eyes", "eye"),
-}
-REQUIRED_BONE_ALIASES = ("spine", "head", "arm.L", "arm.R", "leg.L", "leg.R")
-
-MORPH_ALIASES: dict[str, tuple[str, ...]] = {
-    "A": ("あ", "a", "mouth_a", "aa"),
-    "I": ("い", "i", "mouth_i", "ih"),
-    "U": ("う", "u", "mouth_u", "ou"),
-    "E": ("え", "e", "mouth_e", "eh"),
-    "O": ("お", "o", "mouth_o", "oh"),
-    "blink": ("まばたき", "blink", "eye_blink", "eyeblink"),
-}
+REQUIRED_BONE_ALIASES = PHASE7_REQUIRED_BONES
 REQUIRED_MOUTH_MORPHS = ("A", "I", "U", "E", "O")
 
 
@@ -51,25 +39,6 @@ def file_sha256(path: Path) -> str:
         for chunk in iter(lambda: handle.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
-
-
-def _fold(value: str) -> str:
-    return re.sub(r"[\s_.-]+", "", value.casefold())
-
-
-def match_aliases(names: list[str], aliases: dict[str, tuple[str, ...]]) -> dict[str, str | None]:
-    """Resolve application-owned aliases using exact, then normalized matches."""
-    exact = {name.casefold(): name for name in names}
-    folded = {_fold(name): name for name in names}
-    result: dict[str, str | None] = {}
-    for alias, candidates in aliases.items():
-        match = next((exact[candidate.casefold()] for candidate in candidates
-                      if candidate.casefold() in exact), None)
-        if match is None:
-            match = next((folded[_fold(candidate)] for candidate in candidates
-                          if _fold(candidate) in folded), None)
-        result[alias] = match
-    return result
 
 
 def inspect_source_bundle(model: Path) -> dict[str, Any]:
@@ -213,7 +182,10 @@ def build_character_contract(project: Path, settings: dict[str, Any], schemas: P
             "cache_collection": profile["cache_collection"],
             "armature_object": profile["armature_object"],
             "model_sha256": profile["model_sha256"],
+            "target_height_meters": float(profile["target_height_meters"]),
+            "dimensions": [float(value) for value in profile["dimensions"]],
             "bone_mapping": profile["bone_mapping"],
+            "bone_axes": profile.get("bone_axes", {}),
             "morph_mapping": profile["morph_mapping"],
             **coverage, "texture_count": int(profile["texture_count"]),
             "missing_texture_count": missing_textures,

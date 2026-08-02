@@ -44,6 +44,17 @@ class Phase5Auditor:
             "character_texture_missing_count": 0,
             "character_asset_warning_count": 0,
             "character_license_warning_count": 0,
+            "harmonization_character_count": 0,
+            "harmonization_ready_count": 0,
+            "neutral_pose_character_count": 0,
+            "scaled_character_count": 0,
+            "grounded_character_count": 0,
+            "bone_axes_verified_count": 0,
+            "source_ik_character_count": 0,
+            "root_grounded_character_count": 0,
+            "adaptive_camera_shot_count": 0,
+            "adaptive_camera_pass_count": 0,
+            "phase8_issue_count": 0,
             "duration_seconds": 0, "output_size_bytes": 0, "output_width": 0,
             "output_height": 0, "estimated_cost": 0,
         }
@@ -195,6 +206,12 @@ class Phase5Auditor:
             and int(scene_report.get("production_character_loaded_count", -1)) == int(summary["character_asset_ready_count"])
             and int(scene_report.get("character_texture_missing_count", -1)) == int(summary["character_texture_missing_count"])
             and int(scene_report.get("character_license_warning_count", -1)) == int(summary["character_license_warning_count"])
+            and int(scene_report.get("harmonization_character_count", -1))
+                == int(summary["harmonization_character_count"])
+            and int(scene_report.get("harmonization_ready_count", -1))
+                == int(summary["harmonization_ready_count"])
+            and int(scene_report.get("adaptive_camera_shot_count", -1))
+                == int(summary["adaptive_camera_shot_count"])
         )
         self._gate(3, "blender_assembly_counts_match", counts_match, summary, {
             "shot_count": scene_report.get("camera_count"),
@@ -219,6 +236,9 @@ class Phase5Auditor:
             "production_character_loaded_count": scene_report.get("production_character_loaded_count"),
             "character_texture_missing_count": scene_report.get("character_texture_missing_count"),
             "character_license_warning_count": scene_report.get("character_license_warning_count"),
+            "harmonization_character_count": scene_report.get("harmonization_character_count"),
+            "harmonization_ready_count": scene_report.get("harmonization_ready_count"),
+            "adaptive_camera_shot_count": scene_report.get("adaptive_camera_shot_count"),
         })
         expected_clips = int(summary["performance_clip_count"])
         pose_keyframes = int(scene_report.get("pose_keyframe_count", 0))
@@ -324,6 +344,80 @@ class Phase5Auditor:
                        "missing_textures": scene_report.get("character_texture_missing_count"),
                        "license_warnings": scene_report.get("character_license_warning_count"),
                    })
+        phase8_report = self._json_gate(
+            8, "phase8_harmonization_report_schema",
+            self._resolve_project_relative(
+                manifest.get("harmonization", {}).get(
+                    "report", "generated/phase8_harmonization_report.json"
+                )
+            ),
+            self.schemas / "phase8_harmonization_report.schema.json",
+        )
+        phase8_contract = manifest.get("harmonization", {})
+        phase8_enabled = bool(phase8_contract.get("enabled", False))
+        phase8_summary = phase8_report.get("summary", {}) if phase8_report else {}
+        expected_harmonized = int(summary["harmonization_character_count"])
+        expected_adaptive = int(summary["adaptive_camera_shot_count"])
+        if phase8_enabled:
+            harmonization_ok = bool(
+                phase8_report
+                and phase8_report.get("enabled") is True
+                and phase8_report.get("status") in {"complete", "failed"}
+                and expected_harmonized > 0
+                and int(phase8_summary.get("character_count", -1)) == expected_harmonized
+                and int(phase8_summary.get("ready_character_count", -1)) == expected_harmonized
+                and int(phase8_summary.get("neutral_pose_character_count", -1)) == expected_harmonized
+                and int(phase8_summary.get("scaled_character_count", -1)) == expected_harmonized
+                and int(phase8_summary.get("grounded_character_count", -1)) == expected_harmonized
+                and int(phase8_summary.get("bone_axes_verified_count", -1)) == expected_harmonized
+                and int(scene_report.get("harmonization_ready_count", -1)) == expected_harmonized
+            )
+            framing_ok = bool(
+                phase8_report
+                and expected_adaptive == int(summary["shot_count"])
+                and int(phase8_summary.get("adaptive_camera_shot_count", -1)) == expected_adaptive
+                and int(phase8_summary.get("framing_passed_shot_count", -1)) == expected_adaptive
+                and int(scene_report.get("adaptive_camera_pass_count", -1)) == expected_adaptive
+            )
+        else:
+            harmonization_ok = bool(
+                phase8_report and phase8_report.get("enabled") is False
+                and phase8_report.get("status") == "skipped"
+                and int(phase8_summary.get("character_count", -1)) == 0
+            )
+            framing_ok = bool(
+                phase8_report and int(phase8_summary.get("adaptive_camera_shot_count", -1)) == 0
+                and int(phase8_summary.get("issue_count", -1)) == 0
+            )
+        self._gate(
+            8, "character_harmonization_ready", harmonization_ok,
+            "every cast member has canonical controls, neutral dialogue pose, normalized scale, "
+            "verified axes, and floor contact",
+            {
+                "enabled": phase8_enabled,
+                "characters": phase8_summary.get("character_count"),
+                "ready": phase8_summary.get("ready_character_count"),
+                "neutral": phase8_summary.get("neutral_pose_character_count"),
+                "scaled": phase8_summary.get("scaled_character_count"),
+                "grounded": phase8_summary.get("grounded_character_count"),
+                "axes_verified": phase8_summary.get("bone_axes_verified_count"),
+            },
+        )
+        self._gate(
+            8, "adaptive_camera_framing_ready", framing_ok,
+            "every shot is framed from evaluated world-space bounds with visible required regions",
+            {
+                "expected_shots": expected_adaptive,
+                "audited_shots": phase8_summary.get("adaptive_camera_shot_count"),
+                "passed_shots": phase8_summary.get("framing_passed_shot_count"),
+                "issues": phase8_summary.get("issue_count"),
+            },
+        )
+        if phase8_report:
+            phase8_path = self._resolve_project_relative(
+                phase8_contract.get("report", "generated/phase8_harmonization_report.json")
+            )
+            self._artifact("phase8_harmonization_report", phase8_path)
         scene_path = self._resolve_project_relative(scene_report.get("scene_file", ""))
         preview_path = self._resolve_project_relative(scene_report.get("preview_video", ""))
         artifacts_exist = scene_path.is_file() and preview_path.is_file() and preview_path.stat().st_size > 0
@@ -363,6 +457,17 @@ class Phase5Auditor:
             "character_texture_missing_count": int(scene_report.get("character_texture_missing_count", 0)),
             "character_asset_warning_count": int(summary["character_asset_warning_count"]),
             "character_license_warning_count": int(scene_report.get("character_license_warning_count", 0)),
+            "harmonization_character_count": int(phase8_summary.get("character_count", 0)),
+            "harmonization_ready_count": int(phase8_summary.get("ready_character_count", 0)),
+            "neutral_pose_character_count": int(phase8_summary.get("neutral_pose_character_count", 0)),
+            "scaled_character_count": int(phase8_summary.get("scaled_character_count", 0)),
+            "grounded_character_count": int(phase8_summary.get("grounded_character_count", 0)),
+            "bone_axes_verified_count": int(phase8_summary.get("bone_axes_verified_count", 0)),
+            "source_ik_character_count": int(phase8_summary.get("source_ik_character_count", 0)),
+            "root_grounded_character_count": int(phase8_summary.get("root_grounded_character_count", 0)),
+            "adaptive_camera_shot_count": int(phase8_summary.get("adaptive_camera_shot_count", 0)),
+            "adaptive_camera_pass_count": int(phase8_summary.get("framing_passed_shot_count", 0)),
+            "phase8_issue_count": int(phase8_summary.get("issue_count", 0)),
         })
         return manifest
 

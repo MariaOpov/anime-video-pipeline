@@ -25,7 +25,7 @@ class Phase3Tests(unittest.TestCase):
             self._write_fixture(project)
             manifest = Phase3Planner(self._config(project), self.schemas).build()
             self.assertEqual(manifest["frame_end"], 48)
-            self.assertEqual(manifest["version"], 5)
+            self.assertEqual(manifest["version"], 6)
             self.assertEqual(manifest["summary"], {
                 "shot_count": 1, "dialogue_count": 1, "mouth_cue_count": 2,
                 "performance_clip_count": 0, "gesture_count": 0,
@@ -40,9 +40,16 @@ class Phase3Tests(unittest.TestCase):
                 "character_texture_missing_count": 0,
                 "character_asset_warning_count": 0,
                 "character_license_warning_count": 0,
+                "harmonization_character_count": 0,
+                "harmonization_ready_count": 0,
+                "adaptive_camera_shot_count": 0,
             })
             self.assertEqual(manifest["character_assets"]["characters"], [])
+            self.assertFalse(manifest["harmonization"]["enabled"])
             self.assertEqual(manifest["dialogue"][0]["mouth_cues"][1]["mouth_shape"], "A")
+            planner = Phase3Planner(self._config(project), self.schemas)
+            planner.write(manifest)
+            self.assertTrue((project / "generated" / "phase8_harmonization_plan.json").is_file())
 
     def test_carries_validated_motion_intent_into_performance_clips(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -78,6 +85,15 @@ class Phase3Tests(unittest.TestCase):
             self._write_fixture(project, lip_character="Ren")
             with self.assertRaisesRegex(ValueError, "identity mismatch"):
                 Phase3Planner(self._config(project), self.schemas).build()
+
+    def test_rejects_phase8_report_path_outside_project(self):
+        with tempfile.TemporaryDirectory() as directory:
+            project = Path(directory)
+            self._write_fixture(project)
+            config = self._config(project)
+            config.data["phase8"] = {"enabled": False, "report": "../../escape.json"}
+            with self.assertRaisesRegex(ValueError, "phase8.report"):
+                Phase3Planner(config, self.schemas).build()
 
     def _config(self, project: Path) -> ProjectConfig:
         return ProjectConfig(project, {

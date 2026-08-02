@@ -38,7 +38,8 @@ Use a non-default Blender executable or project like this:
 1. Verify Python, Piper, Rhubarb, FFmpeg, Blender, project configuration, and
    voice models.
 2. Run Phase 1 planning and Phase 2 dialogue/lip-sync with safe resume.
-3. Build the validated Phase 3 manifest, assemble Blender, and render the MP4.
+3. Build the validated Phase 3/8 manifest, harmonize the cast, audit adaptive
+   framing, assemble Blender, and render only if Phase 8 passes.
 4. Generate subtitles, normalize dialogue, and export the Phase 4 delivery MP4.
 5. Apply release quality gates and create the production report.
 
@@ -60,6 +61,10 @@ time remain in `generated/phase5_run_record.json` for diagnosis.
   real Blender keys, and contain zero framing, collision, continuity, or staging risks.
 - Every activated Phase 7 character is ready and loaded with matching rig,
   facial morph, missing-texture, and license-warning counts.
+- The Phase 8 report passes its strict schema; every cast member passes canonical
+  controls, neutral pose, scale, axes, grounding, and foot-lock checks.
+- Every adaptive camera shot retains its required world-space region, head, and
+  full-body feet where required.
 - The assembled scene and rendered Phase 3 preview exist.
 - The Phase 4 MP4, subtitle count, loudness flag, dimensions, duration, and size pass.
 - The final duration does not exceed `maximum_video_duration`.
@@ -77,3 +82,4 @@ explicitly when a known exception is acceptable.
 
 Both reports are generated files and are excluded from Git. The schema for the
 release report is `schemas/production_report.schema.json`.
+The complete Phase 8 build contains 34 quality gates.

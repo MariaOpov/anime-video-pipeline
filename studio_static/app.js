@@ -34,9 +34,13 @@ const elements = {
   metricCameraDetail: document.querySelector("#metric-camera-detail"),
   metricModels: document.querySelector("#metric-models"),
   metricModelsDetail: document.querySelector("#metric-models-detail"),
+  metricHarmony: document.querySelector("#metric-harmony"),
+  metricHarmonyDetail: document.querySelector("#metric-harmony-detail"),
   metricCost: document.querySelector("#metric-cost"),
   characterSummary: document.querySelector("#character-summary"),
   characterAssets: document.querySelector("#character-assets"),
+  harmonizationSummary: document.querySelector("#harmonization-summary"),
+  harmonizationAssets: document.querySelector("#harmonization-assets"),
   directionSummary: document.querySelector("#direction-summary"),
   directionTimeline: document.querySelector("#direction-timeline"),
   blockingSummary: document.querySelector("#blocking-summary"),
@@ -117,6 +121,8 @@ function renderReport(report) {
     elements.metricCameraDetail.textContent = "Cinematic blocking";
     elements.metricModels.textContent = "—";
     elements.metricModelsDetail.textContent = "Production characters";
+    elements.metricHarmony.textContent = "—";
+    elements.metricHarmonyDetail.textContent = "Scale · ground · frame";
     setChip(elements.qualityChip, "No report", "muted");
     elements.qualityList.replaceChildren();
     const empty = document.createElement("p");
@@ -135,6 +141,8 @@ function renderReport(report) {
   elements.metricCameraDetail.textContent = `${summary.character_placement_count ?? 0} placements · ${summary.camera_keyframe_count ?? 0} keys`;
   elements.metricModels.textContent = `${summary.production_character_loaded_count ?? 0}/${summary.production_character_count ?? 0}`;
   elements.metricModelsDetail.textContent = `${summary.resolved_character_bone_alias_count ?? 0} bones · ${summary.resolved_character_mouth_morph_count ?? 0} morphs`;
+  elements.metricHarmony.textContent = `${summary.harmonization_ready_count ?? 0}/${summary.harmonization_character_count ?? 0}`;
+  elements.metricHarmonyDetail.textContent = `${summary.adaptive_camera_pass_count ?? 0}/${summary.adaptive_camera_shot_count ?? 0} framed · ${summary.phase8_issue_count ?? 0} issue`;
   elements.metricCost.textContent = `$${summary.estimated_cost}`;
   setChip(elements.qualityChip, report.status.toUpperCase(), report.status === "complete" ? "ok" : "danger");
   elements.qualityList.replaceChildren();
@@ -151,6 +159,54 @@ function renderReport(report) {
     copy.append(title, detail);
     item.append(dot, copy);
     elements.qualityList.append(item);
+  });
+}
+
+function renderHarmonization(manifest, report) {
+  const plan = manifest?.harmonization;
+  const summary = report?.summary;
+  elements.harmonizationAssets.replaceChildren();
+  if (!plan?.enabled || !summary) {
+    elements.harmonizationSummary.textContent = plan?.enabled ? "Chưa chạy Blender audit" : "Phase 8 chưa bật";
+    const empty = document.createElement("p");
+    empty.className = "empty-copy";
+    empty.textContent = "Chạy Phase 8 để kiểm tra dáng nghỉ, scale, grounding và adaptive framing.";
+    elements.harmonizationAssets.append(empty);
+    return;
+  }
+  elements.harmonizationSummary.textContent =
+    `${summary.ready_character_count}/${summary.character_count} ready · ` +
+    `${summary.framing_passed_shot_count}/${summary.adaptive_camera_shot_count} framed · ` +
+    `${summary.issue_count} issue`;
+  elements.harmonizationSummary.classList.toggle("danger", summary.issue_count > 0);
+  (report.characters || []).forEach(character => {
+    const card = document.createElement("article");
+    card.className = `character-asset ${character.ready ? "ready" : "failed"}`;
+    const head = document.createElement("div");
+    head.className = "character-asset-head";
+    const name = document.createElement("strong");
+    name.textContent = character.character;
+    const state = document.createElement("span");
+    state.className = `chip ${character.ready ? "" : "chip-danger"}`;
+    state.textContent = character.ready ? "HARMONIZED" : "BLOCKED";
+    head.append(name, state);
+    const details = document.createElement("dl");
+    const rows = [
+      ["Height", `${character.measured_height_meters.toFixed(3)}m / ${character.target_height_meters.toFixed(3)}m`],
+      ["Neutral pose", character.neutral_pose_passed ? "pass" : `${character.arm_deviation_degrees.toFixed(1)}°`],
+      ["Ground", character.grounding_passed ? "locked" : `${character.ground_error_meters.toFixed(3)}m error`],
+      ["Foot lock", character.foot_lock_mode.replaceAll("_", " ")],
+      ["Rig controls", `${character.resolved_control_count}/${character.required_control_count}`],
+    ];
+    rows.forEach(([label, value]) => {
+      const term = document.createElement("dt");
+      const definition = document.createElement("dd");
+      term.textContent = label;
+      definition.textContent = value;
+      details.append(term, definition);
+    });
+    card.append(head, details);
+    elements.harmonizationAssets.append(card);
   });
 }
 
@@ -321,10 +377,11 @@ async function loadDocument(name) {
 
 async function loadStatus() {
   try {
-    const [status, script, motion, report, manifest] = await Promise.all([
+    const [status, script, motion, report, manifest, harmonization] = await Promise.all([
       api("/api/status"), api("/api/script"),
       loadDocument("motion_intent"), loadDocument("production_report"),
       loadDocument("phase3_manifest"),
+      loadDocument("phase8_harmonization_report"),
     ]);
     setChip(elements.projectChip, `${status.project_name} · v${status.pipeline_version}`, "ok");
     setChip(elements.ollamaChip,
@@ -336,6 +393,7 @@ async function loadStatus() {
     renderMotion(motion);
     renderReport(report);
     renderCharacterAssets(manifest);
+    renderHarmonization(manifest, harmonization);
     renderDirection(manifest, report);
     renderBlocking(manifest, report);
     refreshVideo(status.artifacts.final_video);
